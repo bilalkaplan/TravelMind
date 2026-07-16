@@ -1,5 +1,6 @@
 import os
 import sys
+import typing
 import json
 import re
 import subprocess
@@ -237,7 +238,7 @@ def generate_llm_answer(query, hotel_context, chat_history=None):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + prompt),
             temperature=0.3,
             max_tokens=1000,
         )
@@ -283,7 +284,7 @@ Retrieved hotel evidence (from previous search):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
             temperature=0.3,
             max_tokens=1000,
         )
@@ -328,7 +329,7 @@ Retrieved hotel evidence (from previous search):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
             temperature=0.3,
             max_tokens=1000,
         )
@@ -373,7 +374,7 @@ Retrieved hotel evidence (contains Score Components and Weights):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
             temperature=0.3,
             max_tokens=1000,
         )
@@ -407,11 +408,7 @@ Guidelines:
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[
-                {"role": "system", "content": system_prompt},
-            ] + get_truncated_history(chat_history) + [
-                {"role": "user", "content": query}
-            ], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
             temperature=0.7,
             max_tokens=1000,
         )
@@ -466,11 +463,7 @@ Output: {"intent": "general_chat", "location": null}
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=[
-                {"role": "system", "content": system_prompt},
-            ] + get_truncated_history(chat_history) + [
-                {"role": "user", "content": query}
-            ], # type: ignore
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
             temperature=0.0,
             max_tokens=200,
         )
