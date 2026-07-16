@@ -207,6 +207,7 @@ Write the final TravelMind answer for the user.
 Strict rules:
 - Answer ONLY in {language}.
 - Use ONLY the hotel options provided in the evidence. DO NOT invent extra hotels.
+- If the retrieved hotel evidence does not contain the answer to the user's specific question, honestly state 'I don't know' or 'I don't have this information' (in the requested language) rather than inventing an answer.
 - Do not invent hotel names, prices, availability, addresses, live booking status, or scores.
 - Mention that the ratings are based on CMU TripAdvisor dataset evidence.
 - Recommend the best hotel first.
