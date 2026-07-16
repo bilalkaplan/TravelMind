@@ -165,25 +165,49 @@ Hotel Card {index}:
 def get_style_instruction(language):
     if language == "Turkish":
         return """
-Expected Format (in Turkish):
-- Son derece zarif, seçkin (elit) bir concierge gibi sıcak ve prestijli bir giriş cümlesi yaz.
-- SADECE "Retrieved hotel evidence" kısmında verilen oteller için '###' kullanarak bir başlık aç. Asla fazladan otel uydurma.
-- Her otelin altında TravelMind Uygunluk Skorunu, Genel, Temizlik ve Konum puanlarını net bir şekilde belirt. Bilinmeyen puanlar için 'Bilgi Mevcut Değil' yaz.
-- Otelin artı yönlerini (Pros) ve dikkat edilmesi gereken yönlerini (Cautions) yazarken ASLA kendinle çelişme. Hem iyi hem kötü yorum varsa, 'Karmaşık yorumlar alıyor' şeklinde tek bir maddede toparla.
-- Kullanıcının aradığı spesifik bir detay (örn: tek kişilik oda, havuz) otellerde yoksa, bunu her otelin altına papağan gibi kopyala-yapıştır yapma! Sadece en alttaki özet kısmında nazikçe belirt.
-- Placeholder şablon metinleri asla kopyalama, sadece sana verilen "hotel evidence" bloğundaki gerçek metinleri temizleyip kullan. Ham (raw) kod veya sözlük (dictionary) formatında çıktı verme, her zaman güzel bir yazıya dönüştür.
-- Kapanışta yine aynı elit, zarif ve profesyonel concierge üslubunu koruyarak veda et.
+SİZİN İÇİN KESİN KURAL: Aşağıdaki "Örnek Çıktı" (Example Output) şablonunu BİREBİR KOPYALAYIN. Sadece köşeli parantez içindeki yerleri "Retrieved hotel evidence" kısmındaki gerçek verilerle doldurun. Asla kendi yorumunuzu veya talimatları ekrana basmayın!
+
+Örnek Çıktı:
+Size yardımcı olmaktan büyük mutluluk duyarım. Belirttiğiniz tercihlere en uygun otelleri özenle seçtim:
+
+### [Otel Adı 1]
+- **TravelMind Skoru:** [Skor] / 100
+- **Genel:** [Puan] | **Temizlik:** [Puan] | **Konum:** [Puan]
+- **Öne Çıkanlar:** [Temizliği çok iyi vs.]
+- **Dikkat Edilmesi Gerekenler:** [Bazı yorumlar karışık vs.]
+
+### [Otel Adı 2]
+- **TravelMind Skoru:** [Skor] / 100
+- **Genel:** [Puan] | **Temizlik:** [Puan] | **Konum:** [Puan]
+- **Öne Çıkanlar:** [Konumu merkeze yakın vs.]
+- **Dikkat Edilmesi Gerekenler:** [Yok]
+
+*Not: Özel olarak aradığınız [Tek Kişilik Oda vb.] detaylar sistemimizde bulunmuyor olabilir, ancak yukarıdaki seçenekler konforlu bir konaklama için idealdir.*
+
+Başka bir sorunuz veya farklı bir konum tercihiniz olursa lütfen bana bildirin.
 """.strip()
     else:
         return """
-Expected Format (in English):
-- Write an elegant, highly prestigious concierge-level greeting.
-- For EVERY hotel provided in the evidence, create a section using '###'. NEVER invent extra hotels.
-- Under each hotel, list its TravelMind Suitability Score, Overall, Cleanliness, and Location scores. Use 'Not Available' if missing.
-- List Pros and Cautions without ANY contradictions. If reviews are mixed, summarize them as 'Mixed reviews'.
-- If a specific user request is missing from the data, DO NOT repeat it under every single hotel. Only mention it gracefully once in the final summary.
-- NEVER copy placeholder templates. Do not output raw python dictionary strings, format everything elegantly.
-- End with an elegant and professional concierge-style closing.
+STRICT RULE: You MUST perfectly mirror the "Example Output" template below. Only fill in the bracketed placeholders using the provided "Retrieved hotel evidence". Never output instructions or meta-text!
+
+Example Output:
+It is my pleasure to assist you. I have carefully selected the best hotels that match your preferences:
+
+### [Hotel Name 1]
+- **TravelMind Score:** [Score] / 100
+- **Overall:** [Score] | **Cleanliness:** [Score] | **Location:** [Score]
+- **Highlights:** [Great cleanliness etc.]
+- **Cautions:** [Mixed reviews etc.]
+
+### [Hotel Name 2]
+- **TravelMind Score:** [Score] / 100
+- **Overall:** [Score] | **Cleanliness:** [Score] | **Location:** [Score]
+- **Highlights:** [Excellent location etc.]
+- **Cautions:** [None]
+
+*Note: Specific details like [Single Room etc.] might not be available in our records, but the options above offer great comfort.*
+
+Please let me know if you have any other questions or need further assistance.
 """.strip()
 
 def build_prompt(query, language, hotel_context):
