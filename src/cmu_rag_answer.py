@@ -420,7 +420,7 @@ Guidelines:
         return (content or "").strip()
     except Exception: # pylint: disable=broad-exception-caught
         if lang_code == "tr":
-            return "Şu an bağlantı kuramıyorum. Lütfen tekrar deneyin."
+            return "Su an baglanti kuramiyorum. Lutfen tekrar deneyin."
         return "I cannot connect right now. Please try again."
 
 def get_llm_intent_and_location(query: str, chat_history: list) -> dict:
@@ -461,7 +461,7 @@ Query: "Paris'te lüks oteller"
 Output: {"intent": "unsupported_location", "location": null}
 
 Example 3:
-Query: "Merhaba nasılsın?"
+Query: "Merhaba nasilsin?"
 Output: {"intent": "general_chat", "location": null}
 """
     try:
