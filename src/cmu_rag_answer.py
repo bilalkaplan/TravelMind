@@ -227,15 +227,87 @@ def generate_llm_answer(query, hotel_context, chat_history=None):
     base_url = get_foundry_base_url()
 
     client = OpenAI(base_url=base_url, api_key="not-needed")
-
     model_id = get_available_model_id(client)
 
-    system_prompt = """
+    prompt = build_prompt(query, language, hotel_context)
+
+    if DEBUG:
+        print("\nPhi cevap üretiyor...\n")
+
+    try:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=[{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}], # type: ignore
+            temperature=0.3,
+            max_tokens=1000,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception: # pylint: disable=broad-exception-caught
+        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
+
+
+
+def generate_followup_answer(query, last_context, lang_code, chat_history=None):
+    if chat_history is None:
+        chat_history = []
+        
+    language = language_name(lang_code)
+    base_url = get_foundry_base_url()
+
+    client = OpenAI(base_url=base_url, api_key="not-needed")
+    model_id = get_available_model_id(client)
+
+    system_prompt = f"""
+You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated local hotel recommendation assistant.
+The user is asking a follow-up question (e.g. asking for another hotel option) about the previous results.
+
+You must follow these rules:
+- Read the retrieved hotel evidence provided below.
+- If the user asks for another option, DO NOT talk about the very first recommended hotel again, focus on the OTHER hotel options in the evidence.
+- Answer ONLY in {language}.
+- Use ONLY the provided hotel evidence. Do not invent facts.
+- {get_style_instruction(language)}
+""".strip()
+
+    user_prompt = f"""
+User's query: {query}
+Language: {language}
+
+Retrieved hotel evidence (from previous search):
+{last_context}
+""".strip()
+
+    if DEBUG:
+        print("\nPhi alternatif üretiyor...\n")
+
+    try:
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=[{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}], # type: ignore
+            temperature=0.3,
+            max_tokens=1000,
+        )
+        return (response.choices[0].message.content or "").strip()
+    except Exception: # pylint: disable=broad-exception-caught
+        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
+
+
+def generate_preference_refinement_answer(query, last_context, lang_code, chat_history=None):
+    if chat_history is None:
+        chat_history = []
+        
+    language = language_name(lang_code)
+    base_url = get_foundry_base_url()
+
+    client = OpenAI(base_url=base_url, api_key="not-needed")
+    model_id = get_available_model_id(client)
+
+    system_prompt = f"""
 You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated local hotel recommendation assistant.
 The user is refining their preferences (e.g., cleanliness, location, service, room types) for their previous search.
 
 You must follow these rules:
-- Re-evaluate the provided hotel evidence based on the user\'s new priority.
+- Re-evaluate the provided hotel evidence based on the user's new priority.
 - Highlight the hotel that best matches this new preference.
 - Answer ONLY in {language}.
 - Use ONLY the provided hotel evidence. Do not invent facts, prices, or live availability.
