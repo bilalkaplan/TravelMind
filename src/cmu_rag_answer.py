@@ -238,12 +238,13 @@ def generate_llm_answer(query, hotel_context, chat_history=None):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + prompt),
+            messages=typing.cast(typing.Any, [{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
             temperature=0.3,
             max_tokens=1000,
         )
         return (response.choices[0].message.content or "").strip()
-    except Exception: # pylint: disable=broad-exception-caught
+    except Exception as e: # pylint: disable=broad-exception-caught
+        print("\n[HATA DETAYI] LLM Hatası:", str(e))
         return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
 
 
@@ -284,12 +285,13 @@ Retrieved hotel evidence (from previous search):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
             temperature=0.3,
             max_tokens=1000,
         )
         return (response.choices[0].message.content or "").strip()
-    except Exception: # pylint: disable=broad-exception-caught
+    except Exception as e: # pylint: disable=broad-exception-caught
+        print("\n[HATA DETAYI] LLM Hatası:", str(e))
         return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
 
 
@@ -329,12 +331,13 @@ Retrieved hotel evidence (from previous search):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
             temperature=0.3,
             max_tokens=1000,
         )
         return (response.choices[0].message.content or "").strip()
-    except Exception: # pylint: disable=broad-exception-caught
+    except Exception as e: # pylint: disable=broad-exception-caught
+        print("\n[HATA DETAYI] LLM Hatası:", str(e))
         return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
 
 
@@ -374,12 +377,13 @@ Retrieved hotel evidence (contains Score Components and Weights):
     try:
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + system_prompt),
+            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
             temperature=0.3,
             max_tokens=1000,
         )
         return (response.choices[0].message.content or "").strip()
-    except Exception: # pylint: disable=broad-exception-caught
+    except Exception as e: # pylint: disable=broad-exception-caught
+        print("\n[HATA DETAYI] LLM Hatası:", str(e))
         return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
 
 
