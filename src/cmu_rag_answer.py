@@ -10,6 +10,17 @@ import torch
 def get_truncated_history(history):
     return [{'role': msg['role'], 'content': msg['content'][:300] + '...' if len(msg['content']) > 300 else msg['content']} for msg in history]
 
+HOTEL_METADATA_CACHE = None
+
+def load_hotel_metadata():
+    global HOTEL_METADATA_CACHE
+    if HOTEL_METADATA_CACHE is None:
+        try:
+            with open('data/cmu_hotel_metadata.json', 'r', encoding='utf-8') as f:
+                HOTEL_METADATA_CACHE = json.load(f)
+        except Exception as e:
+            HOTEL_METADATA_CACHE = {}
+    return HOTEL_METADATA_CACHE
 
 from openai import OpenAI, BadRequestError  # type: ignore
 from rich.console import Console
@@ -139,11 +150,22 @@ def build_hotel_context(result, index):
         room_info = "Mentioned single rooms."
     elif has_double_room:
         room_info = "Mentioned double rooms."
+        
+    # Inject exact address from OSM Metadata cache
+    metadata_cache = load_hotel_metadata()
+    exact_address = "Not Available"
+    if metadata_cache:
+        hotel_key = f"{hotel_name}::{location}"
+        if hotel_key in metadata_cache:
+            osm_data = metadata_cache[hotel_key].get("osm_data")
+            if osm_data and "address" in osm_data:
+                exact_address = osm_data["address"]
 
     context = f"""
 Hotel Card {index}:
 - Hotel name: {hotel_name}
 - Location: {location}
+- Exact Address: {exact_address}
 - TravelMind suitability score: {scoring["score"]}/100
 - Overall rating: {format_avg(scoring["overall_avg"])}
 - Cleanliness rating: {format_avg(scoring["cleanliness_avg"])}
@@ -171,12 +193,14 @@ SİZİN İÇİN KESİN KURAL: Aşağıdaki "Örnek Çıktı" (Example Output) ş
 Size yardımcı olmaktan büyük mutluluk duyarım. Belirttiğiniz tercihlere en uygun otelleri özenle seçtim:
 
 ### [Otel Adı 1]
+- **Adres:** [Tam Adres]
 - **TravelMind Skoru:** [Skor] / 100
 - **Genel:** [Puan] | **Temizlik:** [Puan] | **Konum:** [Puan]
 - **Öne Çıkanlar:** [Temizliği çok iyi vs.]
 - **Dikkat Edilmesi Gerekenler:** [Bazı yorumlar karışık vs.]
 
 ### [Otel Adı 2]
+- **Adres:** [Tam Adres]
 - **TravelMind Skoru:** [Skor] / 100
 - **Genel:** [Puan] | **Temizlik:** [Puan] | **Konum:** [Puan]
 - **Öne Çıkanlar:** [Konumu merkeze yakın vs.]
@@ -194,12 +218,14 @@ Example Output:
 It is my pleasure to assist you. I have carefully selected the best hotels that match your preferences:
 
 ### [Hotel Name 1]
+- **Address:** [Exact Address]
 - **TravelMind Score:** [Score] / 100
 - **Overall:** [Score] | **Cleanliness:** [Score] | **Location:** [Score]
 - **Highlights:** [Great cleanliness etc.]
 - **Cautions:** [Mixed reviews etc.]
 
 ### [Hotel Name 2]
+- **Address:** [Exact Address]
 - **TravelMind Score:** [Score] / 100
 - **Overall:** [Score] | **Cleanliness:** [Score] | **Location:** [Score]
 - **Highlights:** [Excellent location etc.]
