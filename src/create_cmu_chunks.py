@@ -30,7 +30,7 @@ def safe_rating(value):
     return value
 
 
-def build_hotel_profile_chunk(row):
+def build_hotel_profile_chunk(row, enriched_data=None):
     parts = []
 
     hotel_name = safe_text(row.get("hotel_name", ""))
@@ -49,6 +49,39 @@ def build_hotel_profile_chunk(row):
 
     if hotel_class:
         parts.append(f"Hotel class: {hotel_class}")
+
+    if enriched_data:
+        phone = enriched_data.get("phone")
+        if phone:
+            parts.append(f"Phone: {phone}")
+            
+        amenities = enriched_data.get("amenities")
+        if amenities and isinstance(amenities, list):
+            parts.append(f"Amenities: {', '.join(amenities)}")
+            
+        room_types = enriched_data.get("booking_room_types")
+        if room_types and isinstance(room_types, list):
+            parts.append(f"Room types: {', '.join(room_types)}")
+
+        osm_tags = enriched_data.get("osm_tags", {})
+        features = []
+        if osm_tags.get('breakfast') in ['yes', 'inclusive', 'free']:
+            features.append("Breakfast")
+        if osm_tags.get('swimming_pool') == 'yes':
+            features.append("Swimming Pool")
+        if osm_tags.get('internet_access') in ['yes', 'wlan', 'wifi']:
+            features.append("Free Wi-Fi")
+        if osm_tags.get('wheelchair') == 'yes':
+            features.append("Wheelchair Accessible")
+        if features:
+            parts.append(f"Map Confirmed Features: {', '.join(features)}")
+
+        import urllib.parse
+        if hotel_name and location:
+            map_query = f"{hotel_name} {location}"
+            encoded_query = urllib.parse.quote(map_query)
+            map_link = f"https://www.google.com/maps/search/?api=1&query={encoded_query}"
+            parts.append(f"Map Link: {map_link}")
 
     if review_count_total:
         parts.append(f"Total review count in CMU dataset: {review_count_total}")
@@ -150,6 +183,14 @@ def main():
 
     hotels_df["hotel_id"] = hotels_df["hotel_id"].astype(str)
     reviews_df["hotel_id"] = reviews_df["hotel_id"].astype(str)
+    
+    # Load the comprehensive enriched data from previous RAG extraction
+    enriched_raw = {}
+    enriched_path = Path("data/cmu_hotel_metadata.json")
+    if enriched_path.exists():
+        with open(enriched_path, "r", encoding="utf-8") as f:
+            enriched_raw = json.load(f)
+        print(f"{len(enriched_raw)} adet metadata verisi okundu.")
 
     hotel_lookup = {str(row["hotel_id"]): row for _, row in hotels_df.iterrows()}
 
@@ -162,11 +203,17 @@ def main():
 
         for _, hotel in hotels_df.iterrows():
             hotel_id = str(hotel["hotel_id"])
+            hotel_name = safe_text(hotel.get("hotel_name", ""))
+            location = safe_text(hotel.get("location", ""))
+            
+            # Match the key format used in enrich_search_rag.py
+            enrich_key = f"{hotel_name}::{location}"
+            enriched_data = enriched_raw.get(enrich_key)
 
             chunk = {
                 "chunk_id": f"cmu_hotel_profile_{hotel_id}",
                 "chunk_type": "cmu_hotel_profile",
-                "text": build_hotel_profile_chunk(hotel),
+                "text": build_hotel_profile_chunk(hotel, enriched_data=enriched_data),
                 "metadata": {
                     "dataset": "cmu_tripadvisor",
                     "chunk_type": "hotel_profile",
@@ -182,6 +229,10 @@ def main():
                     ),
                     "review_count_used": safe_text(hotel.get("review_count_used", "")),
                     "source": "cmu_tripadvisor_offering",
+                    "phone": enriched_data.get("phone") if enriched_data else None,
+                    "amenities": enriched_data.get("amenities", []) if enriched_data else [],
+                    "osm_tags": enriched_data.get("osm_tags", {}) if enriched_data else {},
+                    "booking_room_types": enriched_data.get("booking_room_types", []) if enriched_data else []
                 },
             }
 
@@ -196,6 +247,12 @@ def main():
 
             if hotel_row is None:
                 continue
+
+            # Lookup enriched data for this hotel
+            hotel_name = hotel_row.get("hotel_name", "")
+            location = hotel_row.get("location", "")
+            enrich_key = f"{hotel_name}::{location}"
+            enriched_data = enriched_raw.get(enrich_key)
 
             group = group.reset_index(drop=True)
             total_reviews = len(group)
@@ -227,6 +284,10 @@ def main():
                         "review_count_in_chunk": len(review_group),
                         "review_group_number": group_index + 1,
                         "source": "cmu_tripadvisor_review",
+                        "phone": enriched_data.get("phone") if enriched_data else None,
+                        "amenities": enriched_data.get("amenities", []) if enriched_data else [],
+                        "osm_tags": enriched_data.get("osm_tags", {}) if enriched_data else {},
+                        "booking_room_types": enriched_data.get("room_types", []) if enriched_data else []
                     },
                 }
 

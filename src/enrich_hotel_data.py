@@ -79,7 +79,7 @@ def main():
     try:
         for hotel in hotels:
             key = f"{hotel['name']}::{hotel['city']}"
-            if key in metadata:
+            if key in metadata and metadata[key].get("osm_data") is not None:
                 continue
                 
             print(f"[{count+1}/{len(hotels)}] Fetching: {hotel['name']} in {hotel['city']}...")

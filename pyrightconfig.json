@@ -1,0 +1,17 @@
+{
+  "typeCheckingMode": "off",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none",
+  "reportGeneralTypeIssues": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportOptionalSubscript": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportArgumentType": "none",
+  "reportOperatorIssue": "none",
+  "reportOptionalCall": "none",
+  "reportOptionalIterable": "none",
+  "reportUnboundVariable": "none",
+  "reportAssignmentType": "none",
+  "reportCallIssue": "none",
+  "reportPossiblyUnboundVariable": "none"
+}

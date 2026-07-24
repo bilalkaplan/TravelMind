@@ -163,3 +163,5 @@ cython_debug/
 
 # TravelMind Specific
 data/
+*.db
+archive_old/

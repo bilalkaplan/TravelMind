@@ -4,21 +4,15 @@ import sqlite3
 import os
 from pathlib import Path
 
-os.environ.setdefault("HF_HUB_OFFLINE", "1")
-os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
-os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
-os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+# Remove huggingface/transformers environment variables as they are no longer needed
+import numpy as np
+import foundry_local_sdk as foundry
+from foundry_local_sdk import Configuration
 
-import logging
-logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
+DATA_DIR = Path("data")
+DB_PATH = DATA_DIR / "cmu_travelmind.db"
 
-import numpy as np  # type: ignore # noqa: E402
-import torch  # type: ignore # noqa: E402
-from sentence_transformers import SentenceTransformer  # type: ignore # noqa: E402
-
-DB_PATH = Path("data/cmu_travelmind.db")
-MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+MODEL_ID = "qwen3-embedding-0.6b-generic-cpu:1"
 
 TOP_K_HOTELS = 8
 RAW_CANDIDATE_MULTIPLIER = 8
@@ -48,36 +42,22 @@ TURKISH_TO_ENGLISH_HINTS = {
     "yorum": "review comment",
     "plaj": "beach",
     "havalimanı": "airport",
-    "havuz": "pool",
-    "wifi": "wifi internet",
+    "havuz": "pool swimming pool",
+    "wifi": "wifi internet free wifi",
     "internet": "wifi internet",
     "personel": "staff service",
     "servis": "service staff",
     "rahat": "comfortable",
     "konforlu": "comfortable",
+    "tekerlekli sandalye": "wheelchair accessible handicap",
+    "engelli": "wheelchair accessible handicap disabled",
+    "spor": "gym fitness fitness center",
+    "egzersiz": "gym fitness fitness center",
+    "evcil": "pet friendly pets allowed dog cat",
+    "hayvan": "pet friendly pets allowed",
+    "köpek": "pet friendly dog",
+    "kedi": "pet friendly cat",
 }
-
-
-
-
-
-def get_device():
-    forced_device = os.getenv("TRAVELMIND_RETRIEVAL_DEVICE", "").lower().strip()
-
-    if forced_device == "cpu":
-        if DEBUG:
-            print("Embedding device: CPU zorlandı")
-        return "cpu"
-
-    if torch.cuda.is_available():
-        if DEBUG:
-            print("Embedding device: CUDA / GPU")
-            print("GPU:", torch.cuda.get_device_name(0))
-        return "cuda"
-
-    if DEBUG:
-        print("Embedding device: CPU")
-    return "cpu"
 
 def normalize_text(text):
     text = str(text).lower()
@@ -87,24 +67,17 @@ def normalize_text(text):
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
-
 def expand_query(query):
     expanded_parts = [query]
     lower_query = query.lower()
-
     for turkish_phrase, english_hint in TURKISH_TO_ENGLISH_HINTS.items():
         if turkish_phrase in lower_query:
             expanded_parts.append(english_hint)
-
     return " ".join(expanded_parts)
-
-
-
-
 
 def load_chunks_from_db():
     if not DB_PATH.exists():
-        raise FileNotFoundError(f"CMU veritabanı bulunamadı: {DB_PATH}")
+        raise FileNotFoundError(f"CMU veritabani bulunamadi: {DB_PATH}")
 
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
@@ -113,7 +86,6 @@ def load_chunks_from_db():
         SELECT chunk_id, chunk_type, text, metadata_json, embedding_json
         FROM chunks
     """)
-
     rows = cur.fetchall()
     conn.close()
 
@@ -129,65 +101,133 @@ def load_chunks_from_db():
                 "metadata": json.loads(metadata_json),
             }
         )
-
         embeddings.append(json.loads(embedding_json))
 
     embeddings = np.array(embeddings, dtype=np.float32)
-
     return records, embeddings
 
-
-def get_or_load_embedding_model(device):
+def get_or_load_embedding_model():
     global _cached_model
     if _cached_model is None:
         if DEBUG:
-            print("Embedding modeli yükleniyor...")
-        _cached_model = SentenceTransformer(MODEL_NAME, device=device)
+            print("Foundry Local Embedding modeli yukleniyor...")
+        
+        # Sadece manager calisiyorsa baslat
+        if not hasattr(foundry.FoundryLocalManager, 'instance') or foundry.FoundryLocalManager.instance is None:
+            config = Configuration(app_name="TravelMindRAG")
+            foundry.FoundryLocalManager.initialize(config)
+        
+        manager = foundry.FoundryLocalManager.instance
+        models = manager.catalog.list_models()
+        
+        model = manager.catalog.get_model(MODEL_ID)
+        if not model:
+            for m in models:
+                if m.id == MODEL_ID or m.alias == MODEL_ID:
+                    model = manager.catalog.get_model(m.alias)
+                    break
+                    
+        if not model:
+            raise ValueError(f"Model {MODEL_ID} bulunamadi!")
+            
+        if not model.is_loaded:
+            model.load()
+            
+        _cached_model = model.get_embedding_client()
     return _cached_model
-
 
 def get_or_load_chunks():
     global _cached_records, _cached_embeddings
     if _cached_records is None or _cached_embeddings is None:
         if DEBUG:
-            print("CMU chunk kayıtları veritabanından yükleniyor...")
+            print("CMU chunk kayitlari veritabanindan yukleniyor...")
         _cached_records, _cached_embeddings = load_chunks_from_db()
         if DEBUG:
-            print(f"Toplam CMU chunk sayısı: {len(_cached_records)}")
+            print(f"Toplam CMU chunk sayisi: {len(_cached_records)}")
     return _cached_records, _cached_embeddings
 
 def extract_total_review_count_from_text(text):
     match = re.search(r"Total review count in CMU dataset:\s*([0-9]+)", str(text))
-
     if match:
         return match.group(1)
-
     return ""
 
-
-def search(query, location_filter=None, top_k_hotels=TOP_K_HOTELS):
-    device = get_device()
-
-    model = get_or_load_embedding_model(device)
+def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS):
+    model = get_or_load_embedding_model()
     records, embeddings = get_or_load_chunks()
 
     expanded_query = expand_query(query)
 
-    query_embedding = model.encode(
-        expanded_query, normalize_embeddings=True, convert_to_numpy=True
-    )
+    response = model.generate_embedding(expanded_query)
+    query_embedding = np.array(response.data[0].embedding, dtype=np.float32)
 
     vector_scores = embeddings @ query_embedding
+
+    hard_requirements = {
+        'pool': False,
+        'wifi': False,
+        'breakfast': False,
+        'pet': False,
+        'gym': False,
+        'parking': False,
+        'restaurant': False,
+        'bar': False,
+        'spa': False,
+        'room_service': False,
+        'business_center': False,
+        'tv': False,
+        'smoke_free': False
+    }
+    
+    if filters:
+        for k, v in filters.items():
+            if v and k in hard_requirements:
+                hard_requirements[k] = True
 
     scored_records = []
 
     for index, record in enumerate(records):
-        # Strict location filtering
+        metadata = record.get("metadata", {})
         if location_filter:
-            record_location = normalize_text(record["metadata"].get("location", ""))
+            record_location = normalize_text(metadata.get("location", ""))
             filter_location = normalize_text(location_filter)
-            if filter_location not in record_location:
+            city_part = filter_location.split(',')[0].strip()
+            if city_part not in record_location and filter_location not in record_location:
                 continue
+
+        failed_req = False
+        if any(hard_requirements.values()):
+            record_amenities = [str(a).lower() for a in metadata.get("amenities", [])]
+            am_str = " ".join(record_amenities)
+            if hard_requirements['pool'] and not any(w in am_str for w in ['pool', 'havuz', 'yüzme']):
+                failed_req = True
+            if hard_requirements['wifi'] and not any(w in am_str for w in ['wifi', 'wi-fi', 'internet', 'kablosuz']):
+                failed_req = True
+            if hard_requirements['breakfast'] and not any(w in am_str for w in ['breakfast', 'kahvaltı']):
+                failed_req = True
+            if hard_requirements['pet'] and not any(w in am_str for w in ['pet', 'evcil', 'köpek']):
+                failed_req = True
+            if hard_requirements['gym'] and not any(w in am_str for w in ['fitness', 'gym', 'spor', 'egzersiz']):
+                failed_req = True
+            if hard_requirements['parking'] and not any(w in am_str for w in ['parking', 'otopark', 'park']):
+                failed_req = True
+            if hard_requirements['restaurant'] and not any(w in am_str for w in ['restaurant', 'restoran', 'yemek']):
+                failed_req = True
+            if hard_requirements['bar'] and not any(w in am_str for w in ['bar', 'lounge']):
+                failed_req = True
+            if hard_requirements['spa'] and not any(w in am_str for w in ['spa', 'masaj']):
+                failed_req = True
+            if hard_requirements['room_service'] and not any(w in am_str for w in ['room service', 'oda servisi']):
+                failed_req = True
+            if hard_requirements['business_center'] and not any(w in am_str for w in ['business center', 'iş merkezi']):
+                failed_req = True
+            if hard_requirements['tv'] and not any(w in am_str for w in ['tv', 'televizyon']):
+                failed_req = True
+            if hard_requirements['smoke_free'] and not any(w in am_str for w in ['smoke-free', 'non-smoking', 'sigara içilmez']):
+                failed_req = True
+
+        if failed_req:
+            continue
 
         vector_score = float(vector_scores[index])
         chunk_type = record["chunk_type"]
@@ -212,8 +252,6 @@ def search(query, location_filter=None, top_k_hotels=TOP_K_HOTELS):
         )
 
     if not scored_records and location_filter:
-        if DEBUG:
-            print("Uyarı: Sorgudaki konumla eşleşen kayıt bulunamadı.")
         return []
 
     scored_records = sorted(
@@ -257,7 +295,6 @@ def search(query, location_filter=None, top_k_hotels=TOP_K_HOTELS):
 
     for item in unique_results[:top_k_hotels]:
         record = item["record"]
-
         results.append(
             {
                 "score": item["score"],
@@ -273,57 +310,37 @@ def search(query, location_filter=None, top_k_hotels=TOP_K_HOTELS):
 
     return results
 
-
 def main():
-    print("TravelMind RAG - CMU Hotel-Level Retrieval Test")
+    print("TravelMind RAG - CMU Hotel-Level Retrieval Test (Foundry Local)")
     print("-" * 55)
-
-    query = input("Otel tercihini ülke/şehir/bölge dahil yaz: ").strip()
-
+    query = input("Otel tercihini ulke/sehir/bolge dahil yaz: ").strip()
     if not query:
-        print("Soru boş olamaz.")
+        print("Soru bos olamaz.")
         return
 
     results = search(query)
-
     if not results:
-        print("Uygun sonuç bulunamadı.")
+        print("Uygun sonuc bulunamadi.")
         return
 
-    print("\nEn alakalı tekilleştirilmiş CMU otel sonuçları:")
+    print("\nEn alakali tekillestirilmis CMU otel sonuclari:")
     print("=" * 95)
-
     for i, result in enumerate(results, start=1):
         metadata = result["metadata"]
         text = result["text"]
-
         total_review_count = metadata.get("review_count_total", "")
-
         if not total_review_count:
             total_review_count = extract_total_review_count_from_text(text)
 
         print(f"\n{i}. Otel Sonucu")
         print("-" * 95)
-
         print(f"Final skor: {result['score']:.4f}")
-        print(f"Vektör skoru: {result['vector_score']:.4f}")
-        print(f"Konum boost: {result['location_boost']:.4f}")
-        print(f"Tip boost: {result['type_boost']:.4f}")
-
-        print(f"Chunk ID: {result['chunk_id']}")
-        print(f"Chunk type: {result['chunk_type']}")
-
+        print(f"Vektor skoru: {result['vector_score']:.4f}")
         print(f"Otel: {metadata.get('hotel_name', '')}")
         print(f"Konum: {metadata.get('location', '')}")
-        print(f"Hotel class: {metadata.get('hotel_class', '')}")
-        print(f"Total review count: {total_review_count}")
-        print(f"Review count in chunk: {metadata.get('review_count_in_chunk', '')}")
-        print(f"Kaynak: {metadata.get('source', '')}")
-
-        print("\nKanıt metni:")
+        print("\nKanit metni:")
         print(text[:1300])
         print("-" * 95)
-
 
 if __name__ == "__main__":
     main()

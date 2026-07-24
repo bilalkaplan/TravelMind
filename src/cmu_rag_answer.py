@@ -22,7 +22,7 @@ def load_hotel_metadata():
             HOTEL_METADATA_CACHE = {}
     return HOTEL_METADATA_CACHE
 
-from openai import OpenAI, BadRequestError  # type: ignore
+from openai import OpenAI, BadRequestError, APIConnectionError, APIError  # type: ignore
 from rich.console import Console
 from rich.markdown import Markdown
 
@@ -103,8 +103,13 @@ def get_available_model_id(client):
     if DEBUG:
         print("Foundry endpoint üzerindeki modeller kontrol ediliyor...")
 
-    models = client.models.list()
-    model_ids = [model.id for model in models.data]
+    try:
+        models = client.models.list()
+        model_ids = [model.id for model in models.data]
+    except (APIConnectionError, APIError) as e:
+        if DEBUG:
+            print(f"Modeller listelenirken bağlantı hatası: {e}")
+        return "local-model"
 
     if DEBUG:
         print("Bulunan modeller:")
@@ -112,7 +117,7 @@ def get_available_model_id(client):
             print("-", model_id)
 
     if not model_ids:
-        raise RuntimeError("Foundry endpoint üzerinde model bulunamadı.")
+        return "local-model"
 
     for model_id in model_ids:
         if "phi" in model_id.lower():
@@ -269,228 +274,254 @@ Strict rules:
 """.strip()
 
 
-def generate_llm_answer(query, hotel_context, chat_history=None):
-    if chat_history is None:
-        chat_history = []
+def stream_and_strip_think(response, lang_code):
+    is_thinking = False
+    buffer = ""
+    for chunk in response:
+        delta = chunk.choices[0].delta.content or ""
+        if not delta:
+            continue
+            
+        buffer += delta
         
-    lang_code = detect_language(query)
-    language = language_name(lang_code)
-    base_url = get_foundry_base_url()
+        if not is_thinking:
+            if "<think>" in buffer:
+                is_thinking = True
+                parts = buffer.split("<think>")
+                if parts[0]:
+                    yield {"type": "answer", "content": parts[0]}
+                buffer = parts[1]
+            else:
+                if "<" in buffer:
+                    idx = buffer.find("<")
+                    possible_tag = buffer[idx:]
+                    if "<think>".startswith(possible_tag):
+                        if idx > 0:
+                            yield {"type": "answer", "content": buffer[:idx]}
+                            buffer = buffer[idx:]
+                        continue
+                
+                yield {"type": "answer", "content": buffer}
+                buffer = ""
+                
+        if is_thinking:
+            if "</think>" in buffer:
+                is_thinking = False
+                parts = buffer.split("</think>")
+                if parts[0]:
+                    yield {"type": "think", "content": parts[0]}
+                buffer = parts[1]
+            else:
+                if "<" in buffer:
+                    idx = buffer.rfind("<")
+                    possible_tag = buffer[idx:]
+                    if "</think>".startswith(possible_tag):
+                        if idx > 0:
+                            yield {"type": "think", "content": buffer[:idx]}
+                            buffer = buffer[idx:]
+                        continue
+                
+                yield {"type": "think", "content": buffer}
+                buffer = ""
 
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-    model_id = get_available_model_id(client)
+    if buffer:
+        if is_thinking:
+            yield {"type": "think", "content": buffer}
+        else:
+            yield {"type": "answer", "content": buffer}
 
-    prompt = build_prompt(query, language, hotel_context)
-
-    if DEBUG:
-        print("\nPhi cevap üretiyor...\n")
-
+def generate_llm_answer(query, context_str, chat_history, location, lang_code="tr"):
     try:
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
-            temperature=0.3,
-            max_tokens=1000,
-        )
-        return (response.choices[0].message.content or "").strip()
-    except Exception as e: # pylint: disable=broad-exception-caught
-        print("\n[HATA DETAYI] LLM Hatası:", str(e))
-        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
-
-
-
-def generate_followup_answer(query, last_context, lang_code, chat_history=None):
-    if chat_history is None:
-        chat_history = []
+        from openai import OpenAI
+        base_url = get_foundry_base_url()
+        client = OpenAI(base_url=base_url, api_key='not-needed')
+        model_id = get_available_model_id(client)
         
-    language = language_name(lang_code)
-    base_url = get_foundry_base_url()
+        meta = load_hotel_metadata()
+        total_hotels_in_city = sum(1 for h in meta.values() if h.get('city', '').lower() == location.lower()) if location else 0
 
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-    model_id = get_available_model_id(client)
-
-    system_prompt = f"""
-You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated local hotel recommendation assistant.
-The user is asking a follow-up question (e.g. asking for another hotel option) about the previous results.
-
-You must follow these rules:
-- Read the retrieved hotel evidence provided below.
-- If the user asks for another option, DO NOT talk about the very first recommended hotel again, focus on the OTHER hotel options in the evidence.
-- Answer ONLY in {language}.
-- Use ONLY the provided hotel evidence. Do not invent facts.
-- {get_style_instruction(language)}
-""".strip()
-
-    user_prompt = f"""
-User's query: {query}
-Language: {language}
-
-Retrieved hotel evidence (from previous search):
-{last_context}
-""".strip()
-
-    if DEBUG:
-        print("\nPhi alternatif üretiyor...\n")
-
-    try:
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
-            temperature=0.3,
-            max_tokens=1000,
-        )
-        return (response.choices[0].message.content or "").strip()
-    except Exception as e: # pylint: disable=broad-exception-caught
-        print("\n[HATA DETAYI] LLM Hatası:", str(e))
-        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
-
-
-def generate_preference_refinement_answer(query, last_context, lang_code, chat_history=None):
-    if chat_history is None:
-        chat_history = []
+        lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "it": "Italian", "zh": "Chinese"}
+        target_lang = lang_map.get(lang_code, "Turkish")
         
-    language = language_name(lang_code)
-    base_url = get_foundry_base_url()
+        no_chinese_rule = "- Asla Çince karakterler kullanma." if target_lang != "Chinese" else ""
 
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-    model_id = get_available_model_id(client)
+        system_prompt = f"""Sen TravelMind — elit düzeyde profesyonel bir yapay zeka seyahat asistanısın. Müşterilere üst düzey, kusursuz ve sofistike bir deneyim sunmalısın.
 
-    system_prompt = f"""
-You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated local hotel recommendation assistant.
-The user is refining their preferences (e.g., cleanliness, location, service, room types) for their previous search.
+CRITICAL RULES:
+- THE TARGET LANGUAGE FOR YOUR RESPONSE IS STRICTLY: {target_lang}. YOU MUST TRANSLATE EVERYTHING (INCLUDING HEADINGS, LABELS, AND TEXT) TO {target_lang}.
+- SADECE aşağıdaki Otel Verileri kısmındaki bilgilere dayanarak yanıt ver. Verilerde olmayan bir şeyi asla uydurma. Eğer verilen bağlam soruyu cevaplamak için yetersizse veya mevcut değilse, uydurma (halüsinasyon görme). Nazikçe 'Şu anki bilgilerimle bu konuda size yardımcı olamıyorum' veya 'Bununla ilgili yeterli bilgiye sahip değilim' şeklinde cevap ver (Hedef dilde).
+- Fiyat veya bütçelerden asla bahsetme; bu konu sistemin kapsamı dışındadır.
+- Önerdiğin otellerin Harita Bağlantısını (Google Maps linkini) her otelin açıklamasının sonuna tıklanabilir Markdown formatında ekle (Örn: `[Haritada Gör](link)`).
+- Asla "karmaşık yorumlar", "karışık yorumlar" veya "çelişkili yorumlar" deme. Bunun yerine "Yorumlar bu konuda farklılık göstermektedir" veya "Ziyaretçi deneyimleri bu açıdan çeşitlilik göstermektedir" ifadelerini kullan (Tabii ki {target_lang} dilinde).
+- Asla kendi içinde çelişme. 
+- Eğer müşteri '{location}' şehrinde kaç otel bildiğini sorarsa: veritabanımızda tam olarak {total_hotels_in_city} adet seçkin otel var de.
+{no_chinese_rule}
+- YANITINA DOĞRUDAN BAŞLA. ASLA "Okay, the user said..." gibi iç ses analizleri yazma! Sadece müşterine hitap et.
+- ZORUNLU KURAL: Yanıtına KESİNLİKLE `<think>` yazarak BAŞLAMALISIN! Başka hiçbir kelime ile başlama. İç sesini ve planlamanı bu etiket içinde yap, bittikten sonra `</think>` etiketini kapat ve müşteriye asıl elit yanıtını yaz.
 
-You must follow these rules:
-- Re-evaluate the provided hotel evidence based on the user's new priority.
-- Highlight the hotel that best matches this new preference.
-- Answer ONLY in {language}.
-- Use ONLY the provided hotel evidence. Do not invent facts, prices, or live availability.
-- {get_style_instruction(language)}
-""".strip()
+YANIT FORMATI (Bu şablona sadık kal ama başlıkları {target_lang} diline ÇEVİR):
+- Her otel için: 🏨 [Hotel Name], ⭐ [Score Label], ✨ [Highlights Label] (kişiselleştirilmiş), ⚠️ [Cautions Label] (varsa).
+- Yanıtlarını Markdown formatında (kalın yazılar ve emojilerle) ver.
+- Kapanışta kullanıcıya nazikçe bir sonraki adımı sor.
 
-    user_prompt = f"""
-User's new preference query: {query}
-Language: {language}
-
-Retrieved hotel evidence (from previous search):
-{last_context}
-""".strip()
-
-    if DEBUG:
-        print("\nPhi preference refinement cevap üretiyor...\n")
-
-    try:
+Otel Verileri:
+{context_str}
+"""
+        import typing
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
+            messages=typing.cast(typing.Any, [{'role': 'system', 'content': system_prompt}] + get_truncated_history(chat_history) + [{'role': 'user', 'content': query}]),
+            temperature=0.2,
+            max_tokens=4000,
+            stream=True
+        )
+        yield from stream_and_strip_think(response, lang_code)
+    except (APIConnectionError, APIError) as e:
+        polite_msg = {
+            "en": "Hello! I am TravelMind. I am currently experiencing a minor connection issue, but I am here to help you.",
+            "tr": "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım.",
+            "de": "Hallo! Ich bin TravelMind. Ich habe derzeit ein kleines Verbindungsproblem, bin aber hier, um zu helfen.",
+            "fr": "Bonjour! Je suis TravelMind. Je rencontre actuellement un léger problème de connexion, mais je suis là pour vous aider.",
+            "it": "Ciao! Sono TravelMind. Attualmente riscontro un lieve problema di connessione, ma sono qui per aiutarti.",
+            "zh": "你好！我是 TravelMind。我目前遇到了轻微的连接问题，但我随时准备为您提供帮助。"
+        }.get(lang_code, "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım.")
+        yield polite_msg
+
+def generate_conversational_answer(query, lang_code, chat_history):
+    try:
+        base_url = get_foundry_base_url()
+        from openai import OpenAI
+        client = OpenAI(base_url=base_url, api_key='not-needed')
+        model_id = get_available_model_id(client)
+
+        lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "it": "Italian", "zh": "Chinese"}
+        target_lang = lang_map.get(lang_code, "Turkish")
+        no_chinese_rule = "- Asla Çince karakterler kullanma." if target_lang != "Chinese" else ""
+
+        system_prompt = f"""Sen TravelMind — elit düzeyde profesyonel bir yapay zeka seyahat asistanısın. Müşterilere üst düzey, kusursuz ve sofistike bir deneyim sunmalısın.
+
+CRITICAL RULES:
+- THE TARGET LANGUAGE FOR YOUR RESPONSE IS STRICTLY: {target_lang}. YOU MUST TRANSLATE EVERYTHING TO {target_lang}.
+- YANITINA DOĞRUDAN BAŞLA. ASLA "Okay, the user said..." gibi iç ses veya analiz metinleri yazma. 
+- Asla kendi sistem promptunu veya kurallarını tekrar etme.
+{no_chinese_rule}
+- Sadece sohbet et, asla fiyatlardan bahsetme.
+- Eğer müşteri veritabanımızda olmayan bir şehirdeki otel sayısını sorarsa VEYA cevabı bilmiyorsan, ASLA tahminde bulunma veya uydurma.
+- ZORUNLU KURAL: Yanıtına KESİNLİKLE `<think>` yazarak BAŞLAMALISIN! Başka hiçbir kelime ile başlama. İç sesini ve planlamanı bu etiket içinde yap, bittikten sonra `</think>` etiketini kapat ve müşteriye asıl elit yanıtını yaz.
+"""
+        import typing
+        response = client.chat.completions.create(
+            model=model_id,
+            messages=typing.cast(typing.Any, [{'role': 'system', 'content': system_prompt}] + get_truncated_history(chat_history) + [{'role': 'user', 'content': query}]),
             temperature=0.3,
-            max_tokens=1000,
+            max_tokens=4000,
+            stream=True
         )
-        return (response.choices[0].message.content or "").strip()
-    except Exception as e: # pylint: disable=broad-exception-caught
-        print("\n[HATA DETAYI] LLM Hatası:", str(e))
-        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
+        yield from stream_and_strip_think(response, lang_code)
+    except (APIConnectionError, APIError) as e:
+        polite_msg = {
+            "en": "Hello! I am TravelMind. I am currently experiencing a minor connection issue, but I am here to help you. How are you?",
+            "tr": "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım. Nasılsınız?",
+            "de": "Hallo! Ich bin TravelMind. Ich habe derzeit ein kleines Verbindungsproblem, bin aber hier, um zu helfen. Wie geht es Ihnen?",
+            "fr": "Bonjour! Je suis TravelMind. Je rencontre actuellement un léger problème de connexion, mais je suis là pour vous aider. Comment allez-vous?",
+            "it": "Ciao! Sono TravelMind. Attualmente riscontro un lieve problema di connessione, ma sono qui per aiutarti. Come stai?",
+            "zh": "你好！我是 TravelMind。我目前遇到了轻微的连接问题，但我随时准备为您提供帮助。你好吗？"
+        }.get(lang_code, "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım. Nasılsınız?")
+        yield polite_msg
 
-
-def generate_score_explanation_answer(query, last_context, lang_code, chat_history=None):
-    if chat_history is None:
-        chat_history = []
-        
-    language = language_name(lang_code)
-    base_url = get_foundry_base_url()
-
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-    model_id = get_available_model_id(client)
-
-    system_prompt = f"""
-You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated local hotel recommendation assistant.
-The user is asking how the TravelMind suitability score was calculated for the previous hotels.
-
-You must follow these rules:
-- Read the Score Components and Score Weights from the provided hotel evidence (Hotel Card).
-- Explain that the score is a weighted sum of these components, calculated by Python code (not by you).
-- Do not hallucinate a different formula.
-- Answer ONLY in {language}.
-- Use elegant markdown formatting.
-""".strip()
-
-    user_prompt = f"""
-User query: {query}
-Language: {language}
-
-Retrieved hotel evidence (contains Score Components and Weights):
-{last_context}
-""".strip()
-
-    if DEBUG:
-        print("\nPhi score explanation cevap üretiyor...\n")
-
+def generate_followup_answer(query, context_str, lang_code, chat_history):
     try:
+        base_url = get_foundry_base_url()
+        from openai import OpenAI
+        client = OpenAI(base_url=base_url, api_key='not-needed')
+        model_id = get_available_model_id(client)
+
+        lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "it": "Italian", "zh": "Chinese"}
+        target_lang = lang_map.get(lang_code, "Turkish")
+        no_chinese_rule = "- Asla Çince karakterler kullanma." if target_lang != "Chinese" else ""
+
+        system_prompt = f"""Sen TravelMind — elit düzeyde profesyonel bir yapay zeka seyahat asistanısın. Müşterilere üst düzey, kusursuz ve sofistike bir deneyim sunmalısın.
+
+CRITICAL RULES:
+- THE TARGET LANGUAGE FOR YOUR RESPONSE IS STRICTLY: {target_lang}. YOU MUST TRANSLATE EVERYTHING (INCLUDING HEADINGS, LABELS, AND TEXT) TO {target_lang}.
+- SADECE sana sağlanan bağlamdaki (context) verileri kullan. Eğer verilen bağlam soruyu cevaplamak için yetersizse veya mevcut değilse, uydurma (halüsinasyon görme). Nazikçe 'Şu anki bilgilerimle bu konuda size yardımcı olamıyorum' veya 'Bununla ilgili yeterli bilgiye sahip değilim' şeklinde cevap ver (Hedef dilde).
+- Önerdiğin otellerin Harita Bağlantısını (Google Maps linkini) her otelin açıklamasının sonuna tıklanabilir Markdown formatında ekle (Örn: `[Haritada Gör](link)`).
+- Asla "karmaşık yorumlar", "karışık yorumlar" veya "çelişkili yorumlar" deme. Bunun yerine "Yorumlar bu konuda farklılık göstermektedir" veya "Ziyaretçi deneyimleri bu açıdan çeşitlilik göstermektedir" ifadelerini kullan (Tabii ki {target_lang} dilinde).
+- Asla kendi içinde çelişme. 
+{no_chinese_rule}
+- YANITINA DOĞRUDAN BAŞLA. ASLA "Okay, the user said..." gibi iç ses analizleri yazma!
+- ZORUNLU KURAL: Yanıtına KESİNLİKLE `<think>` yazarak BAŞLAMALISIN! Başka hiçbir kelime ile başlama. İç sesini ve planlamanı bu etiket içinde yap, bittikten sonra `</think>` etiketini kapat ve müşteriye asıl elit yanıtını yaz.
+
+YANIT FORMATI:
+- Sıcak, prestijli bir concierge gibi doğrudan cevap ver.
+- Eğer skor soruyorsa: robotik liste değil, doğal bir sohbet havasında açıkla.
+- Yanıtının sonunda konuşmayı ilerletecek nazik bir soru sor.
+
+Mevcut Otel Verileri:
+{context_str}
+"""
+        import typing
         response = client.chat.completions.create(
             model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": user_prompt}]),
-            temperature=0.3,
-            max_tokens=1000,
+            messages=typing.cast(typing.Any, [{'role': 'system', 'content': system_prompt}] + get_truncated_history(chat_history) + [{'role': 'user', 'content': query}]),
+            temperature=0.4,
+            max_tokens=4000,
+            stream=True
         )
-        return (response.choices[0].message.content or "").strip()
-    except Exception as e: # pylint: disable=broad-exception-caught
-        print("\n[HATA DETAYI] LLM Hatası:", str(e))
-        return "Bağlantı hatası." if lang_code == "tr" else "Connection error."
+        yield from stream_and_strip_think(response, lang_code)
+    except (APIConnectionError, APIError) as e:
+        polite_msg = {
+            "en": "Hello! I am TravelMind. I am currently experiencing a minor connection issue, but I am here to help you.",
+            "tr": "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım.",
+            "de": "Hallo! Ich bin TravelMind. Ich habe derzeit ein kleines Verbindungsproblem, bin aber hier, um zu helfen.",
+            "fr": "Bonjour! Je suis TravelMind. Je rencontre actuellement un léger problème de connexion, mais je suis là pour vous aider.",
+            "it": "Ciao! Sono TravelMind. Attualmente riscontro un lieve problema di connessione, ma sono qui per aiutarti.",
+            "zh": "你好！我是 TravelMind。我目前遇到了轻微的连接问题，但我随时准备为您提供帮助。"
+        }.get(lang_code, "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım.")
+        yield polite_msg
 
 
-def generate_conversational_answer(query, lang_code, chat_history=None):
-    if chat_history is None:
-        chat_history = []
-    language = language_name(lang_code)
-    base_url = get_foundry_base_url()
-
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-
-    model_id = get_available_model_id(client)
-
-    system_prompt = f"""
-You are TravelMind, a flawlessly professional, highly elite concierge-level, polite, and sophisticated AI assistant specialized in hotel and accommodation recommendations.
-
-Guidelines:
-1. Act naturally like a human assistant (e.g., ChatGPT). Respond intelligently and specifically to whatever the user says.
-2. You only have data for hotel recommendations. You cannot help with flights, visas, restaurants, or itineraries.
-3. If the user asks for a hotel without specifying a location, politely ask them which city or region they want to stay in.
-4. NEVER invent or recommend specific hotel names. You do NOT have access to the database in this conversational mode. If you need to recommend hotels, you MUST ask the user for their preferred city so you can trigger the database search.
-5. Always write your response in {language}.
-6. Keep your answers concise, warm, and highly conversational.
-""".strip()
-
-    try:
-        response = client.chat.completions.create(
-            model=model_id,
-            messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
-            temperature=0.7,
-            max_tokens=1000,
-        )
-        content = response.choices[0].message.content
-        return (content or "").strip()
-    except Exception: # pylint: disable=broad-exception-caught
-        if lang_code == "tr":
-            return "Su an baglanti kuramiyorum. Lutfen tekrar deneyin."
-        return "I cannot connect right now. Please try again."
+def consume_generator(generator, console):
+    import sys
+    full_answer = ""
+    console.print("\n[bold green]TravelMind:[/bold green] ", end="")
+    for chunk in generator:
+        if isinstance(chunk, dict):
+            if chunk["type"] == "think":
+                sys.stdout.write(f"\033[90m{chunk['content']}\033[0m")
+                sys.stdout.flush()
+            else:
+                full_answer += chunk["content"]
+                sys.stdout.write(chunk["content"])
+                sys.stdout.flush()
+        else:
+            full_answer += chunk
+            sys.stdout.write(chunk)
+            sys.stdout.flush()
+    print()
+    return full_answer
 
 def get_llm_intent_and_location(query: str, chat_history: list) -> dict:
-    base_url = get_foundry_base_url()
-    client = OpenAI(base_url=base_url, api_key="not-needed")
-    model_id = get_available_model_id(client)
+    try:
+        base_url = get_foundry_base_url()
+        from openai import OpenAI
+        import typing, json
+        client = OpenAI(base_url=base_url, api_key="not-needed")
+        model_id = get_available_model_id(client)
 
-    system_prompt = """
-You are the Intent and Location Routing Engine for TravelMind AI.
+        system_prompt = """
+You are the Intent, Location, and Keyword Routing Engine for TravelMind AI.
 Analyze the user's query and output a raw JSON object. Do not wrap it in markdown backticks.
 
 Supported US Cities:
 New York City, NY; Chicago, IL; San Francisco, CA; Boston, MA; Washington DC, DC; San Diego, CA; Dallas, TX; Houston, TX; Denver, CO; Los Angeles, CA; Seattle, WA; San Antonio, TX; Phoenix, AZ; Philadelphia, PA; Memphis, TN; Baltimore, MD; San Jose, CA; Detroit, MI; Austin, TX; Indianapolis, IN; Jacksonville, FL; Charlotte, NC; Columbus, OH; Fort Worth, TX; El Paso, TX.
 
 Intent Categories:
-- "hotel_search": User wants to search for a hotel in a specific city.
+- "hotel_search": User mentions a city and asks about hotels.
 - "preference_refinement": User is refining their previous hotel search without mentioning a new city (e.g. "I want a cleaner one").
 - "follow_up": User asks for another option from the previous search (e.g. "Başka seçenek var mı?").
 - "score_explanation": User asks how the TravelMind score is calculated.
-- "general_chat": User is greeting, chatting, or asking for help.
+- "general_chat": User is greeting, chatting, or asking for help. Examples: "merhaba", "selam", "hello", "hi". If the user JUST says a greeting and nothing about a city, it MUST be general_chat.
 - "missing_location": User is asking for a hotel but hasn't mentioned ANY city/region.
 - "unsupported_location": User is asking for a hotel in a city NOT in the Supported US Cities list (e.g. Paris, Miami, Istanbul).
 - "out_of_scope": User asks about flights, restaurants, visas, etc.
@@ -499,22 +530,34 @@ Intent Categories:
 Output JSON format exactly:
 {
   "intent": "<category>",
-  "location": "<Formal name of the Supported City if detected, else null>"
+  "location": "<Formal name of the Supported City if detected, else null>",
+  "filters": {
+    "pool": <boolean, true if user asks for pool/swimming>,
+    "wifi": <boolean, true if user asks for wifi/internet>,
+    "breakfast": <boolean, true if user asks for breakfast>,
+    "pet": <boolean, true if user asks for pet-friendly>,
+    "gym": <boolean, true if user asks for gym/fitness>,
+    "parking": <boolean, true if user asks for parking>,
+    "restaurant": <boolean, true if user asks for a restaurant/dining>,
+    "bar": <boolean, true if user asks for a bar/lounge>,
+    "spa": <boolean, true if user asks for a spa>,
+    "room_service": <boolean, true if user asks for room service>,
+    "business_center": <boolean, true if user asks for a business center/work space>,
+    "tv": <boolean, true if user asks for a TV>,
+    "smoke_free": <boolean, true if user asks for a smoke-free/non-smoking room>
+  }
 }
 
+CRITICAL: YOU MUST OUTPUT ONLY RAW JSON. DO NOT WRITE ANY OTHER TEXT. NO EXPLANATIONS.
+
 Example 1:
-Query: "Windy city'de temiz bir yer arıyorum"
-Output: {"intent": "hotel_search", "location": "Chicago, IL"}
+Query: "Windy city'de ucuz havuzlu bir yer arıyorum"
+Output: {"intent": "hotel_search", "location": "Chicago, IL", "filters": {"pool": true, "wifi": false, "breakfast": false, "pet": false, "gym": false, "parking": false, "restaurant": false, "bar": false, "spa": false, "room_service": false, "business_center": false, "tv": false, "smoke_free": false}}
 
 Example 2:
 Query: "Paris'te lüks oteller"
-Output: {"intent": "unsupported_location", "location": null}
-
-Example 3:
-Query: "Merhaba nasilsin?"
-Output: {"intent": "general_chat", "location": null}
+Output: {"intent": "unsupported_location", "location": null, "filters": {"pool": false, "wifi": false, "breakfast": false, "pet": false, "gym": false, "parking": false, "restaurant": false, "bar": false, "spa": false, "room_service": false, "business_center": false, "tv": false, "smoke_free": false}}
 """
-    try:
         response = client.chat.completions.create(
             model=model_id,
             messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
@@ -522,16 +565,69 @@ Output: {"intent": "general_chat", "location": null}
             max_tokens=200,
         )
         content = response.choices[0].message.content.strip()
-        if content.startswith("```json"):
-            content = content[7:-3].strip()
-        elif content.startswith("```"):
-            content = content[3:-3].strip()
+        import re
+        match = re.search(r'\{.*?\}', content, re.DOTALL)
+        parsed = None
+        if match:
+            try:
+                parsed = json.loads(match.group(0))
+            except json.JSONDecodeError:
+                pass
+                
+        if not parsed:
+            parsed = {"intent": "general_chat", "location": None, "filters": {}}
             
-        return json.loads(content)
+        # Hard fallback heuristic
+        q_lower = query.lower()
+        import difflib
+        is_hotel_query = False
+        words = q_lower.replace("'", " ").replace('"', " ").split()
+        if "otel" in q_lower or "hotel" in q_lower or "kalacak" in q_lower or "konaklama" in q_lower:
+            is_hotel_query = True
+        else:
+            if difflib.get_close_matches("otel", words, n=1, cutoff=0.7) or difflib.get_close_matches("hotel", words, n=1, cutoff=0.7):
+                is_hotel_query = True
+
+        if parsed.get("intent") in ["general_chat", "missing_location"] and is_hotel_query:
+            cities_map = {
+                "dallas": "Dallas, TX", "chicago": "Chicago, IL", "new york": "New York City, NY",
+                "san francisco": "San Francisco, CA", "boston": "Boston, MA", "washington": "Washington DC, DC",
+                "san diego": "San Diego, CA", "houston": "Houston, TX", "denver": "Denver, CO",
+                "los angeles": "Los Angeles, CA", "seattle": "Seattle, WA", "san antonio": "San Antonio, TX",
+                "phoenix": "Phoenix, AZ", "philadelphia": "Philadelphia, PA", "memphis": "Memphis, TN",
+                "baltimore": "Baltimore, MD", "san jose": "San Jose, CA", "detroit": "Detroit, MI",
+                "austin": "Austin, TX", "indianapolis": "Indianapolis, IN", "jacksonville": "Jacksonville, FL",
+                "charlotte": "Charlotte, NC", "columbus": "Columbus, OH", "fort worth": "Fort Worth, TX",
+                "el paso": "El Paso, TX"
+            }
+            import difflib
+            words = q_lower.split()
+            bigrams = [" ".join(words[i:i+2]) for i in range(len(words)-1)]
+            all_tokens = words + bigrams
+            
+            best_match = None
+            best_val = None
+            
+            for c_key, c_val in cities_map.items():
+                if c_key in q_lower:
+                    best_match = c_key
+                    best_val = c_val
+                    break
+                
+                matches = difflib.get_close_matches(c_key, all_tokens, n=1, cutoff=0.75)
+                if matches:
+                    best_match = matches[0]
+                    best_val = c_val
+                    break
+                    
+            if best_match:
+                parsed["intent"] = "hotel_search"
+                parsed["location"] = best_val
+                    
+        return parsed
     except Exception as e:
         print(f"Error in intent routing: {e}")
-        return {"intent": "general_chat", "location": None}
-
+        return {"intent": "general_chat", "location": None, "filters": {}}
 
 def main():
     console = Console()
@@ -693,7 +789,11 @@ def main():
         if user_messages:
             search_query = user_messages[-1] + " " + query
 
-        results = search(search_query, location_filter=location, top_k_hotels=TOP_K_RETRIEVAL)
+        try:
+            results = search(search_query, location_filter=location, top_k_hotels=TOP_K_RETRIEVAL)
+        except Exception as e:
+            print(f"RAG Retrieval failed: {e}")
+            results = []
 
         if not results:
             print(no_result_message(lang_code))
@@ -718,13 +818,8 @@ def main():
         last_results = results
         last_context = hotel_context_str
 
-        answer = generate_llm_answer(query, hotel_context_str, chat_history)
-
-        console.print("\n[bold cyan]TravelMind Final Cevap[/bold cyan]" if lang_code == "tr" else "\n[bold cyan]TravelMind Final Answer[/bold cyan]")
-        console.print("[dim]" + ("-" * 80) + "[/dim]")
-        
-        md = Markdown(answer)
-        console.print(md)
+        generator = generate_llm_answer(query, hotel_context_str, chat_history, location, lang_code)
+        answer = consume_generator(generator, console)
         
         console.print("\n[dim]Not:[/dim]" if lang_code == "tr" else "\n[dim]Note:[/dim]")
         console.print("[dim]- Retrieval ve skorlar CMU TripAdvisor datasetinden gelen chunk'lara dayanır.[/dim]" if lang_code == "tr" else "[dim]- Retrieval and scores are based on CMU TripAdvisor dataset chunks.[/dim]")

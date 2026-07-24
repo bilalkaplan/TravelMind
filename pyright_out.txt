@@ -1,0 +1,562 @@
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "float"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "Number"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "int"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "NAType"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "NaTType"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "Timestamp"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\apply_manual_labels.py:75 Cannot access attribute "astype" for class "Timedelta"
+  Attribute "astype" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:41 Cannot access attribute "between" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "between" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:43 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[str])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:43 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[Any])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:43 Cannot access attribute "drop_duplicates" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "drop_duplicates" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:58 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_dataset.py:61 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:108 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:111 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:115 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:117 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:123 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:136 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:142 Argument of type "None" cannot be assigned to parameter "default_value" of type "str" in function "get_column"
+  "None" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:153 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[str])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:153 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[Any])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\clean_hotel_catalog.py:191 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:15 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:15 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:18 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:18 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:19 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:19 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_chunks.py:32 "chunk" is possibly unbound
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_hotel_catalog_chunks.py:89 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_hotel_catalog_chunks.py:89 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_hotel_catalog_chunks.py:90 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_hotel_catalog_chunks.py:90 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:49 Cannot access attribute "to_csv" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "to_csv" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:61 Cannot access attribute "columns" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "columns" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:64 Cannot access attribute "drop" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "drop" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:68 No parameter named "subset"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:78 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[str])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:78 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[Any])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\archive_old\create_reliable_hotel_subset.py:114 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:16 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Operator "<" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "int"
+  Operator "<" not supported for types "ExtensionArray" and "int"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Operator ">" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "int"
+  Operator ">" not supported for types "ExtensionArray" and "int"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:17 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:19 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | NAType | NaTType | Timestamp | Timedelta" cannot be assigned to parameter "obj" of type "Sized" in function "len"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | NAType | NaTType | Timestamp | Timedelta" is not assignable to type "Sized"
+    "NAType" is incompatible with protocol "Sized"
+      "__len__" is not present
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_dataset.py:74 Cannot access attribute "to_csv" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "to_csv" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:55 Cannot access attribute "nunique" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "nunique" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:56 Cannot access attribute "nunique" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "nunique" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:58 Cannot access attribute "nunique" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "nunique" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:59 Cannot access attribute "nunique" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "nunique" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:83 No overloads for "sort_values" match the provided arguments
+  Argument types: (list[str], Literal[False])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:147 Argument of type "Series | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "Series | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+    Type "Series" is not assignable to type "ConvertibleToFloat"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:147 Argument of type "Series | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "Series | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+    Type "Series" is not assignable to type "ConvertibleToFloat"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:148 Argument of type "Series | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "Series | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+    Type "Series" is not assignable to type "ConvertibleToFloat"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:148 Argument of type "Series | Any | Unknown" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "Series | Any | Unknown" is not assignable to type "ConvertibleToFloat"
+    Type "Series" is not assignable to type "ConvertibleToFloat"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:149 Argument of type "Series | Unknown | Any" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | Unknown | Any" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_hotel_name_and_review_density.py:149 Argument of type "Series | Unknown | Any" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+  Type "Series | Unknown | Any" is not assignable to type "ConvertibleToInt"
+    Type "Series" is not assignable to type "ConvertibleToInt"
+      "Series" is not assignable to "str"
+      "Series" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "Series" is incompatible with protocol "SupportsInt"
+        "__int__" is not present
+      "Series" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "float"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "Number"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "number[Any, Any]"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "int"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "ArrowExtensionArray"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "NAType"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "NaTType"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "Timestamp"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "Timedelta"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "BooleanArray"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "FloatingArray"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "IntegerArray"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "ExtensionArray"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:44 Cannot access attribute "notna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "notna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "float"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "Number"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "number[Any, Any]"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "int"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "NAType"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "NaTType"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "Timestamp"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "Timedelta"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:45 Cannot access attribute "isna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "isna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:47 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:50 Argument of type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" is not assignable to type "ConvertibleToFloat"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:50 Argument of type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" is not assignable to type "ConvertibleToFloat"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:50 Cannot access attribute "min" for class "ArrowExtensionArray"
+  Attribute "min" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:50 Cannot access attribute "min" for class "ExtensionArray"
+  Attribute "min" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:51 Argument of type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" is not assignable to type "ConvertibleToFloat"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:51 Argument of type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "ArrayLike | tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | Unknown | NaTType | float | object | complex | Timestamp | Timedelta | Any" is not assignable to type "ConvertibleToFloat"
+    Type "object" is not assignable to type "ConvertibleToFloat"
+      "object" is not assignable to "str"
+      "object" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "object" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "object" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:51 Cannot access attribute "max" for class "ArrowExtensionArray"
+  Attribute "max" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:51 Cannot access attribute "max" for class "ExtensionArray"
+  Attribute "max" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:52 Argument of type "tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]] | Unknown | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]] | Unknown | Any" is not assignable to type "ConvertibleToFloat"
+    Type "BooleanArray" is not assignable to type "ConvertibleToFloat"
+      "BooleanArray" is not assignable to "str"
+      "BooleanArray" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "BooleanArray" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "BooleanArray" is incompatible with protocol "SupportsIndex"
+  ...
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:52 Argument of type "tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]] | Unknown | Any" cannot be assigned to parameter "x" of type "ConvertibleToFloat" in function "__new__"
+  Type "tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], tuple[tuple[Unknown, tuple[Unknown, Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]], Unknown] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]]] | FloatingArray | BooleanArray | TimedeltaArray | <subclass of ndarray[_AnyShape, dtype[Any]] and TimedeltaArray> | IntegerArray | ndarray[_AnyShape, dtype[Any]] | Unknown | Any" is not assignable to type "ConvertibleToFloat"
+    Type "BooleanArray" is not assignable to type "ConvertibleToFloat"
+      "BooleanArray" is not assignable to "str"
+      "BooleanArray" is incompatible with protocol "Buffer"
+        "__buffer__" is not present
+      "BooleanArray" is incompatible with protocol "SupportsFloat"
+        "__float__" is not present
+      "BooleanArray" is incompatible with protocol "SupportsIndex"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:52 Cannot access attribute "mean" for class "Index"
+  Attribute "mean" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:52 Cannot access attribute "mean" for class "ArrowExtensionArray"
+  Attribute "mean" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:52 Cannot access attribute "mean" for class "ExtensionArray"
+  Attribute "mean" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:53 Operator "<" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "Literal[0]"
+  Operator "<" not supported for types "ExtensionArray" and "Literal[0]"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\audit_quality_and_evaluation_plan.py:53 Operator ">" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "Literal[10]"
+  Operator ">" not supported for types "ExtensionArray" and "Literal[10]"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\cmu_rag_answer.py:245 "strip" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\cmu_rag_answer.py:265 "strip" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\cmu_rag_answer.py:298 "strip" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_balanced_comment_eval_set.py:79 Cannot access attribute "isin" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "isin" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_balanced_comment_eval_set.py:181 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_balanced_comment_eval_set.py:184 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:120 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[str])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:120 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[Any])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:175 Cannot access attribute "str" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "str" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:176 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[str])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:176 No overloads for "drop_duplicates" match the provided arguments
+  Argument types: (list[Any])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:176 Cannot access attribute "drop_duplicates" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "drop_duplicates" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:231 No overloads for "reset_index" match the provided arguments
+  Argument types: (Literal['review_count_total'])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:244 Argument of type "set[Any]" cannot be assigned to parameter "values" of type "Series | DataFrame | Sequence[Unknown] | Mapping[Unknown, Unknown]" in function "isin"
+  Type "set[Any]" is not assignable to type "Series | DataFrame | Sequence[Unknown] | Mapping[Unknown, Unknown]"
+    "set[Any]" is not assignable to "Series"
+    "set[Any]" is not assignable to "DataFrame"
+    "set[Any]" is not assignable to "Sequence[Unknown]"
+    "set[Any]" is not assignable to "Mapping[Unknown, Unknown]"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:255 No overloads for "reset_index" match the provided arguments
+  Argument types: (Literal['review_count_used'])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\create_cmu_subset.py:302 No overloads for "reset_index" match the provided arguments
+  Argument types: (Literal['raw_name_count'])
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:49 Argument of type "Literal[0]" cannot be assigned to parameter "zero_division" of type "str" in function "classification_report"
+  "Literal[0]" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:53 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:54 Cannot access attribute "value_counts" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "value_counts" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:60 Cannot access attribute "empty" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "empty" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:74 Cannot access attribute "columns" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "columns" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:75 Cannot access attribute "to_string" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "to_string" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_balanced_comment_predictions.py:75 Cannot access attribute "to_string" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "to_string" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\evaluate_comment_predictions.py:52 Argument of type "Literal[0]" cannot be assigned to parameter "zero_division" of type "str" in function "classification_report"
+  "Literal[0]" is not assignable to "str"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_balanced_comment_analyzer.py:86 "download" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_balanced_comment_analyzer.py:94 "load" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_balanced_comment_analyzer.py:99 Object of type "None" is not subscriptable
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_balanced_comment_analyzer.py:201 "id" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_comment_analyzer.py:85 "download" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_comment_analyzer.py:93 "load" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_comment_analyzer.py:98 Object of type "None" is not subscriptable
+c:\Users\Lenovo\Desktop\travelmind-rag\src\llm_comment_analyzer.py:198 "id" is not a known attribute of "None"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:11 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Operator "<" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "int"
+  Operator "<" not supported for types "ExtensionArray" and "int"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Operator ">" not supported for types "Series | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | BooleanArray | ExtensionArray | FloatingArray | IntegerArray | Any | Unknown" and "int"
+  Operator ">" not supported for types "ExtensionArray" and "int"
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "float"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Number"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "number[Any, Any]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "int"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "NAType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "NaTType"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Timestamp"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "Timedelta"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "ndarray[_AnyShape, dtype[Any]]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:12 Cannot access attribute "dropna" for class "ndarray[_AnyShape, _dtype]"
+  Attribute "dropna" is unknown
+c:\Users\Lenovo\Desktop\travelmind-rag\src\validate_hotel_data.py:14 Argument of type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | NAType | NaTType | Timestamp | Timedelta" cannot be assigned to parameter "obj" of type "Sized" in function "len"
+  Type "Series | ndarray[_AnyShape, dtype[Any]] | Any | Unknown | DatetimeIndex | Index | TimedeltaIndex | ArrowExtensionArray | NAType | NaTType | Timestamp | Timedelta" is not assignable to type "Sized"
+    "NAType" is incompatible with protocol "Sized"
+      "__len__" is not present
