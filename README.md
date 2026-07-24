@@ -14,3 +14,10 @@ TravelMind is an AI-powered travel assistant that uses a Retrieval-Augmented Gen
 2. Run `pip install -r requirements.txt`.
 3. Ensure the Foundry Local Service is running (`foundry service start`).
 4. Run the app: `streamlit run ui/app.py`
+
+## Note on Old Database
+Due to GitHub's file size limits, the legacy database (`archive_old/old_databases/travelmind_old_kaggle.db`, ~245MB) was compressed into a zip archive and then split into two parts (`travelmind_old_kaggle.zip.part1` and `travelmind_old_kaggle.zip.part2`). If you need to access this old database, you can merge the parts and extract them:
+```bash
+# On Windows PowerShell
+cat travelmind_old_kaggle.zip.part* > travelmind_old_kaggle.zip
+```
