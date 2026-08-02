@@ -135,14 +135,42 @@ def extract_total_review_count_from_text(text):
         return match.group(1)
     return ""
 
+RAW_HOTEL_DATA_CACHE = None
+
 def get_full_hotel_metadata(hotel_name):
-    records, _ = get_or_load_chunks()
+    global RAW_HOTEL_DATA_CACHE
+    if RAW_HOTEL_DATA_CACHE is None or not RAW_HOTEL_DATA_CACHE:
+        try:
+            import json
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            json_path = os.path.join(base_dir, 'data', 'raw', 'hotel_enriched_raw.json')
+            with open(json_path, 'r', encoding='utf-8') as f:
+                RAW_HOTEL_DATA_CACHE = json.load(f)
+        except Exception as e:
+            print(f"Error loading metadata JSON: {e}")
+            RAW_HOTEL_DATA_CACHE = {}
+
     target_lower = str(hotel_name).lower().strip()
-    for r in records:
-        if r.get("chunk_type") == "hotel_profile":
-            meta = r.get("metadata", {})
-            if str(meta.get("hotel_name", "")).lower().strip() == target_lower:
-                return meta
+    
+    # 1. Exact match on hotel_name field
+    for key, data in RAW_HOTEL_DATA_CACHE.items():
+        if str(data.get("hotel_name", "")).lower().strip() == target_lower:
+            return data
+            
+    # 2. Substring match on key
+    for key, data in RAW_HOTEL_DATA_CACHE.items():
+        if target_lower in key.lower():
+            return data
+
+    # 3. Robust Alphanumeric fallback match
+    import re
+    target_norm = re.sub(r'[^a-z0-9]', '', target_lower)
+    if target_norm:
+        for key, data in RAW_HOTEL_DATA_CACHE.items():
+            if target_norm in re.sub(r'[^a-z0-9]', '', key.lower()):
+                return data
+
     return {}
 
 def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS, requested_hotel_name=None):

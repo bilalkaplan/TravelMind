@@ -33,27 +33,28 @@ importlib.reload(hotel_card_builder)
 from cmu_rag_answer import get_llm_intent_and_location, generate_llm_answer, generate_conversational_answer, generate_followup_answer
 
 def sanitize_before_render(answer):
+    if not answer or not str(answer).strip():
+        return None
+        
+    sanitized = str(answer)
     forbidden = [
         "Okay, the user",
-        "Let me start",
-        "I should mention",
-        "I should also",
-        "I need to confirm",
         "The user is asking",
         "<think>",
         "</think>",
-        "provided hotel cards",
         "Chunk Type:",
         "[Insert evidence summary here]",
-        "düşünüyor...",
-        "let me check",
-        "okay,",
-        "tamam, kullanıcı",
-        "tamam,"
+        "düşünüyor..."
     ]
-    if any(x.lower() in str(answer).lower() for x in forbidden):
+    for x in forbidden:
+        # Case insensitive replacement
+        import re
+        sanitized = re.sub(re.escape(x), "", sanitized, flags=re.IGNORECASE)
+        
+    if not sanitized.strip():
         return None
-    return answer
+        
+    return sanitized
 from cmu_retrieve import search
 from travelmind_scoring import calculate_travelmind_score
 from answer_validator import validate_answer
@@ -93,7 +94,8 @@ translations = {
         "lang_label": "Language",
         "theme_label": "Theme",
         "dark_theme": "🌙 Dark",
-        "light_theme": "☀️ Light"
+        "light_theme": "☀️ Light",
+        "lang_warning": "ℹ️ <b>Note:</b> TravelMind answers in the language you select here.<br>⚠️ Changing the language clears unsubmitted text."
     },
     "TR": {
         "flag": "🇹🇷 Türkçe", "code": "tr",
@@ -114,7 +116,8 @@ translations = {
         "lang_label": "Dil",
         "theme_label": "Tema",
         "dark_theme": "🌙 Karanlık",
-        "light_theme": "☀️ Aydınlık"
+        "light_theme": "☀️ Aydınlık",
+        "lang_warning": "ℹ️ <b>Bilgi:</b> Sistem, seçtiğiniz bu dile göre yanıt verir.<br>⚠️ Dil değişimi sohbet kutusunu sıfırlar."
     },
 }
 
@@ -345,6 +348,7 @@ with nav_col2:
         on_change=on_lang_change,
         label_visibility="collapsed"
     )
+    st.markdown(f"<div style='font-size: 11px; color: #ffcccc; margin-top: -10px; margin-bottom: 10px;'>{t['lang_warning']}</div>", unsafe_allow_html=True)
 
 def on_theme_change():
     if st.session_state.theme_selector == t["dark_theme"]:
@@ -370,55 +374,82 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
         if "hotels" in msg and msg["hotels"]:
             for card in msg["hotels"]:
-                # Some old messages might have raw results, check for 'metadata'
-                if "metadata" in card:
-                    hotel_name = card["metadata"].get('hotel_name', t['unknown_hotel'])
-                    location = card["metadata"].get('location', '')
-                    h_class = card["metadata"].get('hotel_class', '')
-                    amenities_list = card["metadata"].get('amenities', [])
-                    score = calculate_travelmind_score("", card).get("travelmind_score", 0)
-                    map_url = card["metadata"].get('map_link')
-                    phone_number = card["metadata"].get('phone', 'UNKNOWN')
-                else:
-                    hotel_name = card.get('hotel_name', t['unknown_hotel'])
-                    location = card.get('location', '')
-                    h_class = card.get('hotel_class', '')
-                    if not h_class or str(h_class).lower() in ["nan", "none", "unknown", "null", ""]:
-                        h_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
-                    amenities_dict = card.get('amenities', {})
-                    raw_am_list = [k for k, v in amenities_dict.items() if v == 'YES' and k != 'other']
-                    nice_am = []
-                    for k in raw_am_list:
-                        if k == "wifi": nice_am.append("Kesintisiz yüksek hızlı internet erişimi" if t['code'] == 'tr' else "Seamless high-speed internet access")
-                        elif k == "breakfast": nice_am.append("Zengin ve taze sabah kahvaltısı" if t['code'] == 'tr' else "Rich and fresh morning breakfast")
-                        elif k == "pool": nice_am.append("Ferahlatıcı yüzme havuzu" if t['code'] == 'tr' else "Refreshing swimming pool")
-                        elif k == "wheelchair_accessible": nice_am.append("Tam tekerlekli sandalye erişilebilirliği" if t['code'] == 'tr' else "Full wheelchair accessibility")
-                        elif k == "parking": nice_am.append("Güvenli otopark hizmeti" if t['code'] == 'tr' else "Secure parking service")
-                        elif k == "pet_friendly": nice_am.append("Evcil hayvan dostu konaklama imkanı" if t['code'] == 'tr' else "Pet-friendly accommodation")
+                hotel_name = card.get('hotel_name', t['unknown_hotel'])
+                location = card.get('location', '')
+                h_class = card.get('hotel_class', '')
+                if not h_class or str(h_class).lower() in ["nan", "none", "unknown", "null", ""]:
+                    h_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
+                
+                score = card.get('travelmind_score', 0)
+                map_url = card.get('map_link')
+                phone_number = card.get('phone', 'UNKNOWN')
+                
+                amenities_dict = card.get('amenities', {})
+                if isinstance(amenities_dict, list):
+                    amenities_dict = {} 
+                
+                nice_am = []
+                for k, v in amenities_dict.items():
+                    if k == 'other':
+                        if isinstance(v, list):
+                            for o_am in v[:4]:
+                                nice_am.append(str(o_am).title())
+                        continue
+                    if v == 'YES':
+                        if k == 'wifi': nice_am.append("Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)")
+                        elif k == 'pool': nice_am.append("Pool" if t['code'] != 'tr' else "Havuz")
+                        elif k == 'gym' or k == 'gym_fitness': nice_am.append("Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu")
+                        elif k == 'breakfast': nice_am.append("Breakfast" if t['code'] != 'tr' else "Kahvaltı")
+                        elif k == 'parking': nice_am.append("Parking" if t['code'] != 'tr' else "Otopark")
+                        elif k == 'wheelchair_accessible': nice_am.append("Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi")
+                        elif k == 'pet_friendly': nice_am.append("Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu")
                         else: nice_am.append(k.replace('_', ' ').capitalize())
-                    amenities_list = nice_am
-                    score = card.get('travelmind_score', 0)
-                    map_url = card.get('map_link')
-                    phone_number = card.get('phone', 'UNKNOWN')
-                    
+                
+                room_info_dict = card.get('room_info', {})
+                room_types_list = room_info_dict.get('room_types', room_info_dict.get('booking_room_types', []))
+                if isinstance(room_types_list, str): room_types_list = [room_types_list]
+                
+                has_suite = room_info_dict.get("suite") == "YES"
+                rooms_list = []
+                if has_suite:
+                    rooms_list.append("Suite (Suit Oda)" if t['code'] == 'tr' else "Suite")
+                if room_types_list:
+                    for rt in room_types_list[:4]:
+                        if "suite" not in str(rt).lower():
+                            rooms_list.append(str(rt))
+                            
                 with st.container():
                     st.markdown("---")
                     st.markdown(f"#### 🏨 {hotel_name}")
                     c1, c2 = st.columns([2.5, 1.5])
                     with c1:
                         st.write(f"📍 **{location}** | {t['class_label']}: {h_class}")
-                        if phone_number and phone_number != 'UNKNOWN':
+                        if phone_number and phone_number != 'UNKNOWN' and str(phone_number).lower() not in ['none', 'null']:
                             st.write(f"📞 **Telefon:** {phone_number}" if t['code'] == 'tr' else f"📞 **Phone:** {phone_number}")
-                        if amenities_list:
-                            display_list = amenities_list[:6]
+                        if nice_am:
                             if t['code'] == 'tr':
-                                msg = "Misafirlerimize sunulan ayrıcalıklar arasında; " + ", ".join(display_list[:-1]) + (" ve " + display_list[-1] if len(display_list) > 1 else display_list[0]) + " bulunmaktadır."
+                                msg_am = "Misafirlerimize sunulan ayrıcalıklar arasında; " + ", ".join(nice_am) + " bulunmaktadır."
                             else:
-                                msg = "Exclusive privileges offered to our guests include " + ", ".join(display_list[:-1]) + (" and " + display_list[-1] if len(display_list) > 1 else display_list[0]) + "."
-                            st.write(f"🛠️ **{t['amenities_label']}:** {msg}")
+                                msg_am = "Exclusive privileges offered to our guests include " + ", ".join(nice_am) + "."
+                            st.write(f"🛠️ **{t['amenities_label']}:** {msg_am}")
                         else:
                             empty_msg = "Detaylı olanak bilgisi mevcut kayıtlarımızda teyit edilememiştir." if t['code'] == 'tr' else "Detailed amenity information could not be verified in our current records."
                             st.write(f"🛠️ **{t['amenities_label']}:** {empty_msg}")
+                            
+                        if rooms_list:
+                            if t['code'] == 'tr':
+                                room_msg = ", ".join(rooms_list) + " vb. oda seçenekleri mevcuttur."
+                            else:
+                                room_msg = ", ".join(rooms_list) + " and similar room options are available."
+                            st.write(f"🛏️ **Oda Tipleri:** {room_msg}" if t['code'] == 'tr' else f"🛏️ **Room Types:** {room_msg}")
+                            
+                        req_warnings = card.get("requirement_satisfaction", {})
+                        if req_warnings:
+                            for req_key, req_status in req_warnings.items():
+                                if req_status == "UNKNOWN" or req_status == "MISSING":
+                                    warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
+                                    st.write(f"⚠️ **{warn_msg}**")
+                                    
                     with c2:
                         st.metric(t["score_label"], f"{score:.1f}/100")
                         if map_url and map_url != "UNKNOWN":
@@ -759,66 +790,87 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                     st.markdown("---")
                     
                     for card in sorted_cards:
-                        st.markdown(f"#### 🏨 {card.get('hotel_name', t['unknown_hotel'])}")
-                        c1, c2 = st.columns([2.5, 1.5])
-                        with c1:
-                            raw_class = card.get('hotel_class', '')
-                            if not raw_class or str(raw_class).lower() in ["nan", "none", "unknown", "null", ""]:
-                                display_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
-                            else:
-                                display_class = raw_class
-                            st.write(f"📍 **{card.get('location', '')}** | {t['class_label']}: {display_class}")
-                            
-                            phone_val = card.get('phone', 'UNKNOWN')
-                            if phone_val and phone_val != "UNKNOWN" and phone_val.lower() != "none" and phone_val.lower() != "null":
-                                phone_label = "Telefon" if t['code'] == 'tr' else "Phone"
-                                st.write(f"📞 **{phone_label}:** {phone_val}")
-
-                            room_info_dict = card.get("room_info", {})
-                            room_types = room_info_dict.get("room_types", [])
-                            has_suite = room_info_dict.get("suite") == "YES"
-                            
-                            rooms_list = []
-                            if has_suite:
-                                rooms_list.append("Suite (Suit Oda)" if t['code'] == 'tr' else "Suite")
-                            
-                            if room_types:
-                                for rt in room_types:
-                                    if "suite" not in str(rt).lower():
-                                        rooms_list.append(str(rt))
-                                        
-                            if rooms_list:
-                                rooms_label = "Oda Tipleri" if t['code'] == 'tr' else "Room Types"
-                                st.write(f"🛏️ **{rooms_label}:** {', '.join(rooms_list)}")
-                            
-                            confirmed = []
-                            for am_key, am_val in card.get('amenities', {}).items():
-                                if am_key == 'other': continue
-                                if am_val == 'YES':
-                                    confirmed.append(am_key.replace('_', ' ').capitalize())
+                        hotel_name = card.get('hotel_name', t['unknown_hotel'])
+                        location = card.get('location', '')
+                        h_class = card.get('hotel_class', '')
+                        if not h_class or str(h_class).lower() in ["nan", "none", "unknown", "null", ""]:
+                            h_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
+                        
+                        score = card.get('travelmind_score', 0)
+                        map_url = card.get('map_link')
+                        phone_number = card.get('phone', 'UNKNOWN')
+                        
+                        amenities_dict = card.get('amenities', {})
+                        if isinstance(amenities_dict, list):
+                            amenities_dict = {} 
+                        
+                        nice_am = []
+                        for k, v in amenities_dict.items():
+                            if k == 'other':
+                                if isinstance(v, list):
+                                    for o_am in v[:4]:
+                                        nice_am.append(str(o_am).title())
+                                continue
+                            if v == 'YES':
+                                if k == 'wifi': nice_am.append("Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)")
+                                elif k == 'pool': nice_am.append("Pool" if t['code'] != 'tr' else "Havuz")
+                                elif k == 'gym' or k == 'gym_fitness': nice_am.append("Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu")
+                                elif k == 'breakfast': nice_am.append("Breakfast" if t['code'] != 'tr' else "Kahvaltı")
+                                elif k == 'parking': nice_am.append("Parking" if t['code'] != 'tr' else "Otopark")
+                                elif k == 'wheelchair_accessible': nice_am.append("Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi")
+                                elif k == 'pet_friendly': nice_am.append("Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu")
+                                else: nice_am.append(k.replace('_', ' ').capitalize())
+                        
+                        room_info_dict = card.get('room_info', {})
+                        room_types_list = room_info_dict.get('room_types', room_info_dict.get('booking_room_types', []))
+                        if isinstance(room_types_list, str): room_types_list = [room_types_list]
+                        
+                        has_suite = room_info_dict.get("suite") == "YES"
+                        rooms_list = []
+                        if has_suite:
+                            rooms_list.append("Suite (Suit Oda)" if t['code'] == 'tr' else "Suite")
+                        if room_types_list:
+                            for rt in room_types_list[:4]:
+                                if "suite" not in str(rt).lower():
+                                    rooms_list.append(str(rt))
                                     
-                            if confirmed:
-                                st.write(f"🛠️ **{t['amenities_label']}:** {', '.join(confirmed)}")
-                            else:
-                                empty_msg = "Mevcut veri setinde doğrulanmış olanak bilgisi yok." if t['code'] == 'tr' else "Confirmed amenities: Not available in the current dataset."
-                                st.write(f"🛠️ **{t['amenities_label']}:** {empty_msg}")
-                                
-                            for req_key, req_status in query_requirements.items():
-                                if req_status == "REQUIRED":
-                                    sat = card.get("requirement_satisfaction", {}).get(req_key, "UNKNOWN")
-                                    if sat == "UNKNOWN":
-                                        warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
-                                        st.write(f"⚠️ **{warn_msg}**")
-                        with c2:
-                            st.metric(t["score_label"], f"{card.get('travelmind_score', 0):.1f}/100")
-                            m_type = card.get('map_link_type', 'UNKNOWN')
-                            m_link = card.get('map_link', '')
-                            if m_type == 'exact':
-                                m_label = "Haritada Gör" if t['code'] == 'tr' else "View on Map"
-                                st.markdown(f"👉 **[{m_label}]({m_link})**", unsafe_allow_html=True)
-                            elif m_type == 'search':
-                                m_label = "Haritada Ara" if t['code'] == 'tr' else "Search on Map"
-                                st.markdown(f"👉 **[{m_label}]({m_link})**", unsafe_allow_html=True)
+                        with st.container():
+                            st.markdown("---")
+                            st.markdown(f"#### 🏨 {hotel_name}")
+                            c1, c2 = st.columns([2.5, 1.5])
+                            with c1:
+                                st.write(f"📍 **{location}** | {t['class_label']}: {h_class}")
+                                if phone_number and phone_number != 'UNKNOWN' and str(phone_number).lower() not in ['none', 'null']:
+                                    st.write(f"📞 **Telefon:** {phone_number}" if t['code'] == 'tr' else f"📞 **Phone:** {phone_number}")
+                                if nice_am:
+                                    if t['code'] == 'tr':
+                                        msg_am = "Misafirlerimize sunulan ayrıcalıklar arasında; " + ", ".join(nice_am) + " bulunmaktadır."
+                                    else:
+                                        msg_am = "Exclusive privileges offered to our guests include " + ", ".join(nice_am) + "."
+                                    st.write(f"🛠️ **{t['amenities_label']}:** {msg_am}")
+                                else:
+                                    empty_msg = "Detaylı olanak bilgisi mevcut kayıtlarımızda teyit edilememiştir." if t['code'] == 'tr' else "Detailed amenity information could not be verified in our current records."
+                                    st.write(f"🛠️ **{t['amenities_label']}:** {empty_msg}")
+                                    
+                                if rooms_list:
+                                    if t['code'] == 'tr':
+                                        room_msg = ", ".join(rooms_list) + " vb. oda seçenekleri mevcuttur."
+                                    else:
+                                        room_msg = ", ".join(rooms_list) + " and similar room options are available."
+                                    st.write(f"🛏️ **Oda Tipleri:** {room_msg}" if t['code'] == 'tr' else f"🛏️ **Room Types:** {room_msg}")
+                                    
+                                req_warnings = card.get("requirement_satisfaction", {})
+                                if req_warnings:
+                                    for req_key, req_status in req_warnings.items():
+                                        if req_status == "UNKNOWN" or req_status == "MISSING":
+                                            warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
+                                            st.write(f"⚠️ **{warn_msg}**")
+                                            
+                            with c2:
+                                st.metric(t["score_label"], f"{score:.1f}/100")
+                                if map_url and map_url != "UNKNOWN":
+                                    map_label = "Haritada Gör" if t['code'] == 'tr' else "View on Map"
+                                    st.markdown(f"👉 **[{map_label}]({map_url})**", unsafe_allow_html=True)
                         st.markdown("---")
                     
                     st.session_state.last_hotel_cards = sorted_cards

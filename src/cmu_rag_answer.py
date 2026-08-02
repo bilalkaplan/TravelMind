@@ -236,10 +236,11 @@ Hotel Card {index}:
 
 
 
-def stream_and_strip_think(response, lang_code):
-    is_thinking = False
+def stream_extract_answer(response, lang_code):
+    inside_answer = False
+    has_seen_answer_tag = False
     buffer = ""
-    answer_buffer = ""
+    raw_full_buffer = ""
     
     for chunk in response:
         delta = chunk.choices[0].delta.content or ""
@@ -247,82 +248,61 @@ def stream_and_strip_think(response, lang_code):
             continue
             
         buffer += delta
+        raw_full_buffer += delta
         
-        if not is_thinking:
-            if "<think>" in buffer:
-                is_thinking = True
-                parts = buffer.split("<think>")
-                if parts[0]:
-                    ans = parts[0].replace("`", "")
-                    if ans:
-                        answer_buffer += ans
-                        if answer_buffer.strip():
-                            yield {"type": "answer", "content": answer_buffer}
-                        answer_buffer = ""
+        if not inside_answer:
+            if "<answer>" in buffer:
+                inside_answer = True
+                has_seen_answer_tag = True
+                parts = buffer.split("<answer>")
                 buffer = parts[1]
-            else:
-                if "<" in buffer:
-                    idx = buffer.find("<")
-                    possible_tag = buffer[idx:]
-                    if "<think>".startswith(possible_tag):
-                        if idx > 0:
-                            ans = buffer[:idx].replace("`", "")
-                            answer_buffer += ans
-                            buffer = buffer[idx:]
-                        continue
                 
-                ans = buffer.replace("`", "")
-                answer_buffer += ans
-                buffer = ""
-                
-                if any(punct in answer_buffer for punct in [". ", "! ", "? ", "\n"]):
-                    last_idx = max(answer_buffer.rfind(". "), answer_buffer.rfind("! "), answer_buffer.rfind("? "), answer_buffer.rfind("\n"))
-                    if last_idx != -1:
-                        split_point = last_idx + 1 if answer_buffer[last_idx] == "\n" else last_idx + 2
-                        complete_part = answer_buffer[:split_point]
-                        answer_buffer = answer_buffer[split_point:]
-                        
-                        if complete_part.strip():
-                            yield {"type": "answer", "content": complete_part}
-                        else:
-                            yield {"type": "answer", "content": complete_part}
-                
-        if is_thinking:
-            if "</think>" in buffer:
-                is_thinking = False
-                parts = buffer.split("</think>")
-                if parts[0]:
-                    yield {"type": "think", "content": parts[0]}
-                buffer = parts[1]
-            else:
-                if "<" in buffer:
+                if "</answer>" in buffer:
+                    inside_answer = False
+                    sub_parts = buffer.split("</answer>")
+                    if sub_parts[0]:
+                        yield {"type": "answer", "content": sub_parts[0]}
+                    buffer = sub_parts[1]
+                else:
                     idx = buffer.rfind("<")
-                    possible_tag = buffer[idx:]
-                    if "</think>".startswith(possible_tag):
-                        if idx > 0:
-                            yield {"type": "think", "content": buffer[:idx]}
-                            buffer = buffer[idx:]
-                        continue
-                
-                yield {"type": "think", "content": buffer}
-                buffer = ""
-
-    if buffer:
-        if is_thinking:
-            yield {"type": "think", "content": buffer}
+                    if idx != -1:
+                        yield {"type": "answer", "content": buffer[:idx]}
+                        buffer = buffer[idx:]
+                    else:
+                        yield {"type": "answer", "content": buffer}
+                        buffer = ""
+            else:
+                # Keep the last 10 characters in case <answer> is split across chunks
+                buffer = buffer[-10:]
         else:
-            answer_buffer += buffer.replace("`", "")
-            
-    if answer_buffer.strip():
-        yield {"type": "answer", "content": answer_buffer}
-    elif answer_buffer:
-        yield {"type": "answer", "content": answer_buffer}
+            if "</answer>" in buffer:
+                inside_answer = False
+                parts = buffer.split("</answer>")
+                if parts[0]:
+                    yield {"type": "answer", "content": parts[0]}
+                buffer = parts[1]
+            else:
+                idx = buffer.rfind("<")
+                if idx != -1:
+                    yield {"type": "answer", "content": buffer[:idx]}
+                    buffer = buffer[idx:]
+                else:
+                    yield {"type": "answer", "content": buffer}
+                    buffer = ""
+
+    if not has_seen_answer_tag and raw_full_buffer.strip():
+        # Fallback: if the model completely failed to output <answer>,
+        # try to split by \n\n and take the last part (usually the final answer after CoT)
+        parts = raw_full_buffer.split("\n\n")
+        final_guess = parts[-1] if len(parts) > 1 else raw_full_buffer
+        if final_guess.strip():
+            yield {"type": "answer", "content": final_guess.strip()}
 
 def generate_llm_answer(query, hotel_context_str, chat_history, location, lang_code="tr", hotel_cards=None):
     try:
                         
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=25.0)
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
         model_id = get_available_model_id(client)
             
         meta = load_hotel_metadata()
@@ -351,15 +331,20 @@ def generate_llm_answer(query, hotel_context_str, chat_history, location, lang_c
             max_tokens=4000,
             stream=True
         )
-        yield from stream_and_strip_think(response, lang_code)
+        yield from stream_extract_answer(response, lang_code)
     except Exception as e:
-        yield {"type": "answer", "content": safe_card_based_fallback_answer(hotel_cards=hotel_cards if hotel_cards else [], language=lang_code)}
+        import traceback
+        traceback.print_exc()
+        is_tr = str(lang_code).lower().startswith("tr")
+        warning = "⚠️ **Sistem Uyarısı:** Yerel yapay zeka servisine (Foundry) ulaşılamıyor. Lütfen terminalden `foundry service start` komutunu çalıştırın.\n\n" if is_tr else "⚠️ **System Warning:** Local AI service (Foundry) is unreachable. Please run `foundry service start` in your terminal.\n\n"
+        fallback_content = safe_card_based_fallback_answer(hotel_cards=hotel_cards if hotel_cards else [], language=lang_code)
+        yield {"type": "answer", "content": warning + fallback_content}
 
 
 def generate_conversational_answer(query, lang_code, chat_history):
     try:
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=25.0)
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
         model_id = get_available_model_id(client)
 
         lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "it": "Italian", "zh": "Chinese"}
@@ -376,12 +361,14 @@ def generate_conversational_answer(query, lang_code, chat_history):
             max_tokens=4000,
             stream=True
         )
-        yield from stream_and_strip_think(response, lang_code)
+        yield from stream_extract_answer(response, lang_code)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         polite_msg = {
-            "en": "Hello! I am TravelMind. I am currently experiencing a minor connection issue, but I am here to help you. How are you?",
-            "tr": "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım. Nasılsınız?"
-        }.get(lang_code, "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım. Nasılsınız?")
+            "en": "⚠️ **System Warning:** Local AI service (Foundry) is unreachable or encountered an error. Please run `foundry service start` in your terminal.",
+            "tr": "⚠️ **Sistem Uyarısı:** Yerel yapay zeka servisine (Foundry) ulaşılamıyor veya bir hata oluştu. Lütfen terminalden `foundry service start` komutunu çalıştırın."
+        }.get(lang_code, "⚠️ **System Warning:** Local AI service (Foundry) is unreachable. Please run `foundry service start` in your terminal.")
         yield polite_msg
 
 def generate_followup_answer(query, context_str, lang_code, chat_history):
@@ -389,7 +376,7 @@ def generate_followup_answer(query, context_str, lang_code, chat_history):
         from hotel_card_builder import build_hotel_cards
         
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed')
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
         model_id = get_available_model_id(client)
 
         lang_map = {"en": "English", "tr": "Turkish"}
@@ -410,12 +397,14 @@ def generate_followup_answer(query, context_str, lang_code, chat_history):
             max_tokens=4000,
             stream=True
         )
-        yield from stream_and_strip_think(response, lang_code)
+        yield from stream_extract_answer(response, lang_code)
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         polite_msg = {
-            "en": "Hello! I am TravelMind. I am currently experiencing a minor connection issue, but I am here to help you.",
-            "tr": "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım."
-        }.get(lang_code, "Merhaba! Ben TravelMind. Şu an sunucularımla küçük bir bağlantı sorunu yaşıyorum ama size yardım etmek için buradayım.")
+            "en": "⚠️ **System Warning:** Local AI service (Foundry) is unreachable or encountered an error. Please run `foundry service start` in your terminal.",
+            "tr": "⚠️ **Sistem Uyarısı:** Yerel yapay zeka servisine (Foundry) ulaşılamıyor veya bir hata oluştu. Lütfen terminalden `foundry service start` komutunu çalıştırın."
+        }.get(lang_code, "⚠️ **System Warning:** Local AI service (Foundry) is unreachable. Please run `foundry service start` in your terminal.")
         yield polite_msg
 
 

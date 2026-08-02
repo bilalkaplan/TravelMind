@@ -85,17 +85,28 @@ def build_hotel_cards(
         unknowns = 0
         
         normalized_text = str(text).lower()
-        has_single_room = "YES" if "single room" in normalized_text or "tek kişilik" in normalized_text else "UNKNOWN"
-        has_double_room = "YES" if "double room" in normalized_text or "çift kişilik" in normalized_text else "UNKNOWN"
-        
         room_types = metadata.get("room_types", metadata.get("booking_room_types", []))
         if isinstance(room_types, str):
             room_types = [room_types]
         
+        room_types_lower = [str(r).lower() for r in room_types]
+        
+        has_single_room = "UNKNOWN"
+        if any("single" in r or "tek" in r for r in room_types_lower):
+            has_single_room = "YES"
+        elif "single room" in normalized_text or "tek kişilik" in normalized_text:
+            has_single_room = "YES"
+            
+        has_double_room = "UNKNOWN"
+        if any("double" in r or "çift" in r or "twin" in r or "king" in r or "queen" in r for r in room_types_lower):
+            has_double_room = "YES"
+        elif "double room" in normalized_text or "çift kişilik" in normalized_text or "iki kişilik" in normalized_text:
+            has_double_room = "YES"
+        
         has_suite = "UNKNOWN"
-        if room_types and any("suite" in str(r).lower() for r in room_types):
+        if any("suite" in r or "suit" in r or "kral" in r or "king suite" in r for r in room_types_lower):
             has_suite = "YES"
-        elif "suite" in normalized_text:
+        elif "suite" in normalized_text or "suit oda" in normalized_text or "kral dairesi" in normalized_text:
             has_suite = "YES"
 
         # Map fields to extracted values
@@ -167,6 +178,8 @@ def build_hotel_cards(
             "rank_score": rank_score,
             "requirement_satisfaction": requirement_satisfaction,
             "similarity_score": str(res.get("vector_score", "UNKNOWN")),
+            "map_link_type": map_link_type,
+            "map_link": map_link,
             "ratings": {
                 "overall": "UNKNOWN",
                 "cleanliness": "UNKNOWN", 
@@ -199,7 +212,8 @@ def build_hotel_cards(
             "map_link_type": map_link_type,
             "strengths": build_strengths(res),
             "cautions": build_cautions(res),
-            "missing_information": "Review texts might not cover all specific amenities."
+            "missing_information": "Review texts might not cover all specific amenities.",
+            "metadata": metadata
         }
         
         card["_matches"] = matches
