@@ -22,9 +22,56 @@ components.html("""
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 
+import importlib
+import cmu_rag_answer
+import travelmind_scoring
+import hotel_card_builder
+importlib.reload(cmu_rag_answer)
+importlib.reload(travelmind_scoring)
+importlib.reload(hotel_card_builder)
+
 from cmu_rag_answer import get_llm_intent_and_location, generate_llm_answer, generate_conversational_answer, generate_followup_answer
+
+def sanitize_before_render(answer):
+    forbidden = [
+        "Okay, the user",
+        "Let me start",
+        "I should mention",
+        "I should also",
+        "I need to confirm",
+        "The user is asking",
+        "<think>",
+        "</think>",
+        "provided hotel cards",
+        "Chunk Type:",
+        "[Insert evidence summary here]",
+        "düşünüyor...",
+        "let me check",
+        "okay,",
+        "tamam, kullanıcı",
+        "tamam,"
+    ]
+    if any(x.lower() in str(answer).lower() for x in forbidden):
+        return None
+    return answer
 from cmu_retrieve import search
-from cmu_recommend_hotels import calculate_recommendation_score, build_strengths, build_cautions
+from travelmind_scoring import calculate_travelmind_score
+from answer_validator import validate_answer
+from hotel_card_builder import build_hotel_cards
+
+
+def append_message(msg):
+    st.session_state.messages.append(msg)
+    import datetime, os
+    try:
+        log_dir = os.path.join(os.path.dirname(__file__), '..', 'ui_test_logs')
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, 'chat_history.log')
+        with open(log_file, 'a', encoding='utf-8') as f:
+            ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            f.write(f'[{ts}] {msg.get('role', 'UNKNOWN').upper()}:\n{msg.get('content', '')}\n' + '-'*40 + '\n')
+    except Exception:
+        pass
 
 translations = {
     "EN": {
@@ -41,7 +88,7 @@ translations = {
         "class_label": "Class",
         "amenities_label": "Amenities",
         "score_label": "TravelMind Score",
-        "book_now": "Book Now",
+        "map": "View on Map",
         "footer": "Bilal Kocakaplan, 2026. All Rights Reserved.",
         "lang_label": "Language",
         "theme_label": "Theme",
@@ -50,8 +97,8 @@ translations = {
     },
     "TR": {
         "flag": "🇹🇷 Türkçe", "code": "tr",
-        "hero_title": "Amerika'yı Yapay Zeka ile Keşfedin",
-        "hero_subtitle": "ABD'nin 25 popüler şehrindeki on binlerce otel arasından size en uygun olanı bulmak için doğal dilde arama yapın.",
+        "hero_title": "Size en uygun oteli TravelMind ile bulun",
+        "hero_subtitle": "ABD'nin 25 popüler şehrindeki binlerce otel arasından size en uygun olanı bulmak için arama yapın.",
         "chat_placeholder": "Ne tür bir otel arıyorsunuz? (Örn: New York'ta manzaralı ve havuzlu lüks otel)",
         "analyzing": "TravelMind analiz ediyor...",
         "exit_msg": "Görüşmek üzere! İyi seyahatler dilerim.",
@@ -59,104 +106,24 @@ translations = {
         "missing_loc": "Lütfen arama yapmak istediğiniz şehri belirtin. (Örn: Boston, Chicago, Miami)",
         "not_found": "Üzgünüm, {} kriterlerinize uygun otel bulamadım.",
         "unknown_hotel": "Bilinmeyen Otel",
-        "class_label": "Sınıf",
+        "class_label": "Yıldız Sayısı",
         "amenities_label": "Özellikler",
         "score_label": "TravelMind Puanı",
-        "book_now": "Hemen İncele",
+        "map": "Haritada Gör",
         "footer": "Bilal Kocakaplan, 2026. Tüm Hakları Saklıdır.",
         "lang_label": "Dil",
         "theme_label": "Tema",
         "dark_theme": "🌙 Karanlık",
         "light_theme": "☀️ Aydınlık"
     },
-    "DE": {
-        "flag": "🇩🇪 Deutsch", "code": "de",
-        "hero_title": "Finden Sie Ihr Hotel mit TravelMind",
-        "hero_subtitle": "Suchen Sie unter Tausenden von Hotels in 25 beliebten US-Städten, um das für Sie passende zu finden.",
-        "chat_placeholder": "Welche Art von Hotel suchen Sie? (z.B. Ein Luxushotel mit Pool in New York)",
-        "analyzing": "TravelMind analysiert...",
-        "exit_msg": "Auf Wiedersehen! Wir wünschen Ihnen eine gute Reise.",
-        "unsupported_loc": "Leider bediene ich derzeit nur unterstützte US-Städte.",
-        "missing_loc": "Bitte geben Sie die Stadt an, in der Sie suchen möchten. (z. B. Boston, Chicago, Miami)",
-        "not_found": "Es tut uns leid, ich konnte in {} kein Hotel finden, das Ihren Kriterien entspricht.",
-        "unknown_hotel": "Unbekanntes Hotel",
-        "class_label": "Klasse",
-        "amenities_label": "Ausstattung",
-        "score_label": "TravelMind-Ergebnis",
-        "book_now": "Jetzt buchen",
-        "footer": "Bilal Kocakaplan, 2026. Alle Rechte vorbehalten.",
-        "lang_label": "Sprache",
-        "theme_label": "Thema",
-        "dark_theme": "🌙 Dunkel",
-        "light_theme": "☀️ Hell"
-    },
-    "FR": {
-        "flag": "🇫🇷 Français", "code": "fr",
-        "hero_title": "Trouvez votre hôtel avec TravelMind",
-        "hero_subtitle": "Recherchez parmi des milliers d'hôtels dans 25 villes américaines populaires pour trouver celui qui vous convient.",
-        "chat_placeholder": "Quel genre d'hôtel recherchez-vous ? (ex. Un hôtel de luxe avec piscine à New York)",
-        "analyzing": "TravelMind analyse...",
-        "exit_msg": "Au revoir! Bon voyage.",
-        "unsupported_loc": "Malheureusement, je ne dessers actuellement que les villes américaines prises en charge.",
-        "missing_loc": "Veuillez préciser la ville dans laquelle vous souhaitez effectuer la recherche. (ex. Boston, Chicago, Miami)",
-        "not_found": "Désolé, je n'ai pas trouvé d'hôtel correspondant à vos critères à {}.",
-        "unknown_hotel": "Hôtel inconnu",
-        "class_label": "Classe",
-        "amenities_label": "Équipements",
-        "score_label": "Score TravelMind",
-        "book_now": "Réservez maintenant",
-        "footer": "Bilal Kocakaplan, 2026. Tous droits réservés.",
-        "lang_label": "Langue",
-        "theme_label": "Thème",
-        "dark_theme": "🌙 Sombre",
-        "light_theme": "☀️ Clair"
-    },
-    "IT": {
-        "flag": "🇮🇹 Italiano", "code": "it",
-        "hero_title": "Trova il tuo hotel con TravelMind",
-        "hero_subtitle": "Cerca tra migliaia di hotel in 25 famose città degli Stati Uniti per trovare quello giusto per te.",
-        "chat_placeholder": "Che tipo di hotel stai cercando? (es. Un hotel di lusso con piscina a New York)",
-        "analyzing": "TravelMind sta analizzando...",
-        "exit_msg": "Arrivederci! Buon viaggio.",
-        "unsupported_loc": "Sfortunatamente, al momento servo solo le città degli Stati Uniti supportate.",
-        "missing_loc": "Specifica la città in cui desideri effettuare la ricerca. (es. Boston, Chicago, Miami)",
-        "not_found": "Spiacenti, non sono riuscito a trovare un hotel corrispondente ai tuoi criteri in {}.",
-        "unknown_hotel": "Hotel sconosciuto",
-        "class_label": "Classe",
-        "amenities_label": "Servizi",
-        "score_label": "Punteggio TravelMind",
-        "book_now": "Prenota ora",
-        "footer": "Bilal Kocakaplan, 2026. Tutti i diritti riservati.",
-        "lang_label": "Lingua",
-        "theme_label": "Tema",
-        "dark_theme": "🌙 Scuro",
-        "light_theme": "☀️ Chiaro"
-    },
-    "ZH": {
-        "flag": "🇨🇳 中文", "code": "zh",
-        "hero_title": "与 TravelMind 一起寻找您的酒店",
-        "hero_subtitle": "在美国 25 个热门城市的数千家酒店中搜索，找到最适合您的酒店。",
-        "chat_placeholder": "您在寻找什么样的酒店？（例如：纽约带游泳池的豪华酒店）",
-        "analyzing": "TravelMind 正在分析...",
-        "exit_msg": "再见！祝您旅途愉快。",
-        "unsupported_loc": "很抱歉，我目前只服务于受支持的美国城市。",
-        "missing_loc": "请指定您要搜索的城市。（例如：波士顿，芝加哥，迈阿密）",
-        "not_found": "抱歉，我无法在 {} 找到符合您标准的酒店。",
-        "unknown_hotel": "未知酒店",
-        "class_label": "星级",
-        "amenities_label": "设施",
-        "score_label": "TravelMind 评分",
-        "book_now": "立即查看",
-        "footer": "Bilal Kocakaplan, 2026. 保留所有权利。",
-        "lang_label": "语言",
-        "theme_label": "主题",
-        "dark_theme": "🌙 暗色",
-        "light_theme": "☀️ 亮色"
-    }
 }
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+if "selected_hotel_index" not in st.session_state:
+    st.session_state.selected_hotel_index = 0
+if "last_hotel_cards" not in st.session_state:
+    st.session_state.last_hotel_cards = []
 if "theme_internal" not in st.session_state:
     st.session_state.theme_internal = "dark"
 if "current_location" not in st.session_state:
@@ -243,6 +210,18 @@ custom_css = f"""
         color: {chat_text} !important;
     }}
     
+    div[data-testid="stChatMessage"] {{
+        background-color: {chat_bg} !important;
+        border: 1px solid {nav_border} !important;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+    }}
+    div[data-testid="stChatMessage"] * {{
+        color: {chat_text} !important;
+    }}
+    
     /* Selectbox ve Input Fixleri (React Aria ComboBox API'sine özel) */
     div[data-testid="stSelectbox"] .react-aria-ComboBox div[role="group"] {{
         background-color: {input_bg} !important;
@@ -251,6 +230,8 @@ custom_css = f"""
     div[data-testid="stSelectbox"] .react-aria-ComboBox div[role="group"] input {{
         color: {input_text} !important;
         background-color: transparent !important;
+        pointer-events: none !important;
+        cursor: pointer !important;
     }}
     div[data-testid="stSelectbox"] .react-aria-ComboBox div[role="group"] button svg {{
         fill: {input_text} !important;
@@ -350,32 +331,37 @@ with nav_col1:
     else:
         st.markdown(f'<div style="font-size: 26px; font-weight: 900; color: #ffffff; letter-spacing: 1px; margin-top: 4px;">TravelMind</div>', unsafe_allow_html=True)
 
+def on_lang_change():
+    st.session_state.language = st.session_state.lang_selector
+
 with nav_col2:
-    selected_lang_name = st.selectbox(
+    st.radio(
         t["lang_label"],
         options=list(translations.keys()),
         format_func=lambda x: translations[x]["flag"],
-        index=list(translations.keys()).index(st.session_state.language)
+        index=list(translations.keys()).index(st.session_state.language),
+        key="lang_selector",
+        horizontal=True,
+        on_change=on_lang_change,
+        label_visibility="collapsed"
     )
-    if selected_lang_name != st.session_state.language:
-        st.session_state.language = selected_lang_name
-        st.rerun()
+
+def on_theme_change():
+    if st.session_state.theme_selector == t["dark_theme"]:
+        st.session_state.theme_internal = "dark"
+    else:
+        st.session_state.theme_internal = "light"
 
 with nav_col3:
-    selected_theme = st.radio(
+    st.radio(
         t["theme_label"], 
         [t["dark_theme"], t["light_theme"]], 
+        index=0 if st.session_state.theme_internal == "dark" else 1,
+        key="theme_selector",
         horizontal=True,
-        index=0 if st.session_state.theme_internal == "dark" else 1
+        on_change=on_theme_change,
+        label_visibility="collapsed"
     )
-    if selected_theme == t["dark_theme"]:
-        if st.session_state.theme_internal != "dark":
-            st.session_state.theme_internal = "dark"
-            st.rerun()
-    else:
-        if st.session_state.theme_internal != "light":
-            st.session_state.theme_internal = "light"
-            st.rerun()
 
 
 for msg in st.session_state.messages:
@@ -383,22 +369,61 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"], avatar=avatar):
         st.markdown(msg["content"])
         if "hotels" in msg and msg["hotels"]:
-            for res in msg["hotels"]:
-                meta = res["metadata"]
-                score_data = calculate_recommendation_score(res)
-                final_score = score_data["score"]
-                
+            for card in msg["hotels"]:
+                # Some old messages might have raw results, check for 'metadata'
+                if "metadata" in card:
+                    hotel_name = card["metadata"].get('hotel_name', t['unknown_hotel'])
+                    location = card["metadata"].get('location', '')
+                    h_class = card["metadata"].get('hotel_class', '')
+                    amenities_list = card["metadata"].get('amenities', [])
+                    score = calculate_travelmind_score("", card).get("travelmind_score", 0)
+                    map_url = card["metadata"].get('map_link')
+                    phone_number = card["metadata"].get('phone', 'UNKNOWN')
+                else:
+                    hotel_name = card.get('hotel_name', t['unknown_hotel'])
+                    location = card.get('location', '')
+                    h_class = card.get('hotel_class', '')
+                    if not h_class or str(h_class).lower() in ["nan", "none", "unknown", "null", ""]:
+                        h_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
+                    amenities_dict = card.get('amenities', {})
+                    raw_am_list = [k for k, v in amenities_dict.items() if v == 'YES' and k != 'other']
+                    nice_am = []
+                    for k in raw_am_list:
+                        if k == "wifi": nice_am.append("Kesintisiz yüksek hızlı internet erişimi" if t['code'] == 'tr' else "Seamless high-speed internet access")
+                        elif k == "breakfast": nice_am.append("Zengin ve taze sabah kahvaltısı" if t['code'] == 'tr' else "Rich and fresh morning breakfast")
+                        elif k == "pool": nice_am.append("Ferahlatıcı yüzme havuzu" if t['code'] == 'tr' else "Refreshing swimming pool")
+                        elif k == "wheelchair_accessible": nice_am.append("Tam tekerlekli sandalye erişilebilirliği" if t['code'] == 'tr' else "Full wheelchair accessibility")
+                        elif k == "parking": nice_am.append("Güvenli otopark hizmeti" if t['code'] == 'tr' else "Secure parking service")
+                        elif k == "pet_friendly": nice_am.append("Evcil hayvan dostu konaklama imkanı" if t['code'] == 'tr' else "Pet-friendly accommodation")
+                        else: nice_am.append(k.replace('_', ' ').capitalize())
+                    amenities_list = nice_am
+                    score = card.get('travelmind_score', 0)
+                    map_url = card.get('map_link')
+                    phone_number = card.get('phone', 'UNKNOWN')
+                    
                 with st.container():
                     st.markdown("---")
-                    st.markdown(f"#### 🏨 {meta.get('hotel_name', t['unknown_hotel'])}")
-                    c1, c2 = st.columns([3, 1])
+                    st.markdown(f"#### 🏨 {hotel_name}")
+                    c1, c2 = st.columns([2.5, 1.5])
                     with c1:
-                        st.write(f"📍 **{meta.get('location', '')}** | {t['class_label']}: {meta.get('hotel_class', '')}")
-                        st.write(f"🛠️ **{t['amenities_label']}:** {', '.join(meta.get('amenities', [])[:6])}")
+                        st.write(f"📍 **{location}** | {t['class_label']}: {h_class}")
+                        if phone_number and phone_number != 'UNKNOWN':
+                            st.write(f"📞 **Telefon:** {phone_number}" if t['code'] == 'tr' else f"📞 **Phone:** {phone_number}")
+                        if amenities_list:
+                            display_list = amenities_list[:6]
+                            if t['code'] == 'tr':
+                                msg = "Misafirlerimize sunulan ayrıcalıklar arasında; " + ", ".join(display_list[:-1]) + (" ve " + display_list[-1] if len(display_list) > 1 else display_list[0]) + " bulunmaktadır."
+                            else:
+                                msg = "Exclusive privileges offered to our guests include " + ", ".join(display_list[:-1]) + (" and " + display_list[-1] if len(display_list) > 1 else display_list[0]) + "."
+                            st.write(f"🛠️ **{t['amenities_label']}:** {msg}")
+                        else:
+                            empty_msg = "Detaylı olanak bilgisi mevcut kayıtlarımızda teyit edilememiştir." if t['code'] == 'tr' else "Detailed amenity information could not be verified in our current records."
+                            st.write(f"🛠️ **{t['amenities_label']}:** {empty_msg}")
                     with c2:
-                        st.metric(t["score_label"], f"%{final_score:.1f}")
-                        booking_url = f"https://www.booking.com/searchresults.html?ss={meta.get('hotel_name', '').replace(' ', '+')}"
-                        st.markdown(f"👉 **[{t['book_now']}]({booking_url})**", unsafe_allow_html=True)
+                        st.metric(t["score_label"], f"{score:.1f}/100")
+                        if map_url and map_url != "UNKNOWN":
+                            map_label = "Haritada Gör" if t['code'] == 'tr' else "View on Map"
+                            st.markdown(f"👉 **[{map_label}]({map_url})**", unsafe_allow_html=True)
 
 if len(st.session_state.messages) == 0:
     st.markdown(f"""
@@ -409,17 +434,25 @@ if len(st.session_state.messages) == 0:
     """, unsafe_allow_html=True)
 
 if prompt := st.chat_input(t["chat_placeholder"]):
-    st.session_state.messages.append({"role": "user", "content": prompt})
+    append_message({"role": "user", "content": prompt})
     st.rerun()
     
 if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
     prompt = st.session_state.messages[-1]["content"]
     with st.chat_message("assistant", avatar="🌍"):
         with st.spinner(t["analyzing"]):
-            router_res = get_llm_intent_and_location(prompt, st.session_state.messages[:-1])
-            intent = router_res.get("intent", "general_chat")
-            parsed_location = router_res.get("location", None)
-            filters = router_res.get("filters", {})
+            from cmu_rag_answer import fast_route_query
+            fast_res = fast_route_query(prompt, st.session_state)
+            
+            if fast_res:
+                intent = fast_res.get("intent")
+                parsed_location = fast_res.get("location", fast_res.get("city", None))
+                query_requirements = fast_res.get("query_requirements", fast_res.get("requirements", {}))
+            else:
+                router_res = get_llm_intent_and_location(prompt, st.session_state.messages[:-1])
+                intent = router_res.get("intent", "general_chat")
+                parsed_location = router_res.get("location", None)
+                query_requirements = router_res.get("query_requirements", {})
 
             if parsed_location:
                 st.session_state.current_location = parsed_location
@@ -429,163 +462,372 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
             if intent == "exit":
                 response_text = t["exit_msg"]
                 st.markdown(response_text)
-                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                append_message({"role": "assistant", "content": response_text})
                 st.rerun()
             
             elif intent == "unsupported_location":
-                response_text = t["unsupported_loc"]
-                st.markdown(response_text)
-                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                answer_container = st.empty()
+                city_name = parsed_location if parsed_location else "bu şehir"
+                
+                if t["code"] == 'tr':
+                    full_answer = f"TravelMind şu anda {city_name} için otel önerisi sunmuyor. Sistemimiz yalnızca desteklenen şehirlerdeki oteller için çalışır. Fiyat, canlı müsaitlik veya rezervasyon bilgisi sağlamaz."
+                else:
+                    full_answer = f"TravelMind currently does not support hotel recommendations for {city_name}. Our system only works for supported cities. It does not provide live prices, availability, or booking information."
+                
+                answer_container.markdown(full_answer, unsafe_allow_html=True)
+                append_message({"role": "assistant", "content": full_answer})
                 st.rerun()
                 
             elif intent == "missing_location" and not effective_location:
                 response_text = t["missing_loc"]
                 st.markdown(response_text)
-                st.session_state.messages.append({"role": "assistant", "content": response_text})
+                append_message({"role": "assistant", "content": response_text})
                 st.rerun()
                 
-            elif intent in ["general_chat", "score_explanation"]:
+            elif intent == "out_of_scope":
                 answer_container = st.empty()
-                generator = generate_conversational_answer(prompt, t["code"], st.session_state.messages[:-1])
-                full_answer = ""
-                think_text = ""
-                for chunk in generator:
-                    if isinstance(chunk, dict):
-                        if chunk["type"] == "think":
-                            think_text += chunk["content"]
-                            answer_container.markdown(f"<div style='color: #888; font-style: italic; font-size: 0.9em; margin-bottom: 10px;'>🤔 <i>Düşünüyor...</i><br>{think_text}</div>", unsafe_allow_html=True)
-                        else:
-                            full_answer += chunk["content"]
-                            answer_container.markdown(full_answer, unsafe_allow_html=True)
-                    else:
-                        full_answer += chunk
-                        answer_container.markdown(full_answer, unsafe_allow_html=True)
-                st.session_state.messages.append({"role": "assistant", "content": full_answer})
+                if True:
+                    fallback_msg = {
+                        "en": "I am a hotel recommendation assistant. I cannot answer questions outside of hotel search and travel accommodations.",
+                        "tr": "Ben bir otel tavsiye asistanıyım. Otel aramaları ve konaklama dışındaki sorulara yanıt veremiyorum."
+                    }
+                    full_answer = fallback_msg.get(t["code"], fallback_msg["tr"])
+                            
+                answer_container.markdown(full_answer, unsafe_allow_html=True)
+                append_message({"role": "assistant", "content": full_answer})
                 st.rerun()
                 
-            elif intent == "follow_up":
-                last_hotels = None
-                for msg in reversed(st.session_state.messages[:-1]):
-                    if "hotels" in msg and msg["hotels"]:
-                        last_hotels = msg["hotels"]
-                        break
-                
-                if last_hotels:
-                    context_parts = []
-                    for i, res in enumerate(last_hotels):
-                        meta = res["metadata"]
-                        score_data = calculate_recommendation_score(res)
-                        final_score = score_data["score"]
-                        strengths = build_strengths(res, score_data)
-                        cautions = build_cautions(res)
-                        
-                        context_str = f"Otel {i+1}: {meta.get('hotel_name')}\nLokasyon: {meta.get('location')}\nPuan: %{final_score:.1f}\n"
-                        context_str += f"Öne Çıkanlar: {', '.join(strengths) if strengths else '-'}\n"
-                        context_str += f"Dikkat Edilmesi Gerekenler: {', '.join(cautions) if cautions else '-'}\n"
-                        context_str += f"Açıklama: {res['text']}\n"
-                        context_parts.append(context_str)
-                    
-                    full_context = "\n\n".join(context_parts)
-                    answer_container = st.empty()
-                    generator = generate_followup_answer(prompt, full_context, t["code"], st.session_state.messages[:-1])
-                    full_answer = ""
-                    think_text = ""
-                    for chunk in generator:
-                        if isinstance(chunk, dict):
-                            if chunk["type"] == "think":
-                                think_text += chunk["content"]
-                                answer_container.markdown(f"<div style='color: #888; font-style: italic; font-size: 0.9em; margin-bottom: 10px;'>🤔 Düşünüyor...<br>{think_text}</div>", unsafe_allow_html=True)
-                            else:
-                                full_answer += chunk["content"]
-                                answer_container.markdown(full_answer, unsafe_allow_html=True)
-                        else:
-                            full_answer += chunk
-                            answer_container.markdown(full_answer, unsafe_allow_html=True)
-                    
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": full_answer,
-                        "hotels": last_hotels
-                    })
+            elif intent == "class_explanation":
+                answer_container = st.empty()
+                if t["code"] == 'tr':
+                    full_answer = (
+                        "Otel Sınıfı (Class) doğrudan Tripadvisor veri setinden alınan resmi bir meta veridir ve "
+                        "sistemimiz tarafından hesaplanmaz. Sadece otelin kayıtlı olan resmi yıldızını (örn. 4.0, 5.0) "
+                        "temsil eder. Ancak bu değer, nihai TravelMind uygunluk skorunuz hesaplanırken %35 oranında bir etkiye sahiptir."
+                    )
                 else:
-                    answer_container = st.empty()
+                    full_answer = (
+                        "The Hotel Class is an official metadata value directly pulled from the Tripadvisor dataset "
+                        "and is not calculated by our system. It simply represents the hotel's registered official "
+                        "star rating (e.g., 4.0, 5.0). However, this value accounts for 35% of the final TravelMind suitability score."
+                    )
+                
+                answer_container.markdown(full_answer, unsafe_allow_html=True)
+                append_message({"role": "assistant", "content": full_answer})
+                st.rerun()
+                
+            elif intent == "score_explanation":
+                answer_container = st.empty()
+                if t["code"] == 'tr':
+                    full_answer = (
+                        "TravelMind uygunluk skoru, sistem kayıtlarımızdaki zenginleştirilmiş verilere dayanarak hesaplanır. "
+                        "Puanlama ağırlıklı olarak şunları içerir: Otel yıldız sınıfı (%35), Konum eşleşmesi (%25), "
+                        "Sunulan olanakların zenginliği (Wi-Fi, Havuz vb.) (%15), Yatak tipi eşleşmesi (%15), "
+                        "Toplam yorum sayısı güven sinyali (%5) ve Ziyaretçi yorumlarındaki temizlik/kalite hissiyatı (%5). "
+                        "Bu sayede size veri destekli, güvenilir ve tarafsız bir sıralama sunulur."
+                    )
+                else:
+                    full_answer = (
+                        "The TravelMind suitability score is calculated based on the enriched metadata in our system. "
+                        "The scoring primarily includes: Hotel class/stars (35%), Location match (25%), "
+                        "Richness of amenities like Wi-Fi and Pool (15%), Bed type match (15%), "
+                        "Total review count as a trust signal (5%), and Cleanliness/quality sentiment from visitor reviews (5%). "
+                        "This ensures you receive a data-backed, reliable, and unbiased ranking."
+                    )
+                
+                answer_container.markdown(full_answer, unsafe_allow_html=True)
+                append_message({"role": "assistant", "content": full_answer})
+                st.rerun()
+                
+            elif intent == "general_chat":
+                answer_container = st.empty()
+                if True:
                     generator = generate_conversational_answer(prompt, t["code"], st.session_state.messages[:-1])
                     full_answer = ""
-                    think_text = ""
                     for chunk in generator:
-                        if isinstance(chunk, dict):
-                            if chunk["type"] == "think":
-                                think_text += chunk["content"]
-                                answer_container.markdown(f"<div style='color: #888; font-style: italic; font-size: 0.9em; margin-bottom: 10px;'>🤔 Düşünüyor...<br>{think_text}</div>", unsafe_allow_html=True)
-                            else:
-                                full_answer += chunk["content"]
-                                answer_container.markdown(full_answer, unsafe_allow_html=True)
-                        else:
+                        if isinstance(chunk, dict) and chunk["type"] == "answer":
+                            full_answer += chunk["content"]
+                        elif not isinstance(chunk, dict):
                             full_answer += chunk
-                            answer_container.markdown(full_answer, unsafe_allow_html=True)
-                    st.session_state.messages.append({"role": "assistant", "content": full_answer})
+                            
+                    full_answer = sanitize_before_render(full_answer)
+                    if full_answer is None:
+                        fallback_msg = {
+                            "en": "I am a hotel recommendation assistant. How can I help you with your travel plans today?",
+                            "tr": "Ben bir otel tavsiye asistanıyım. Bugün seyahat planlarınızda size nasıl yardımcı olabilirim?",
+                            "de": "Ich bin ein Hotel-Empfehlungsassistent. Wie kann ich Ihnen heute bei Ihren Reiseplänen helfen?",
+                            "fr": "Je suis un assistant de recommandation d'hôtels. Comment puis-je vous aider avec vos projets de voyage aujourd'hui?",
+                            "it": "Sono un assistente per le raccomandazioni alberghiere. Come posso aiutarti con i tuoi programmi di viaggio oggi?",
+                            "zh": "我是酒店推荐助手。今天我能为您的旅行计划做些什么？"
+                        }
+                        full_answer = fallback_msg.get(t["code"], fallback_msg["tr"])
+                answer_container.markdown(full_answer, unsafe_allow_html=True)
+                append_message({"role": "assistant", "content": full_answer})
+                st.rerun()
+                
+            elif intent in ["price_question", "followup_pool", "followup_breakfast", "followup_other_hotel", "follow_up", "specific_hotel_info"]:
+                last_cards = st.session_state.get("last_hotel_cards", [])
+                selected_idx = st.session_state.get("selected_hotel_index", 0)
+                answer_container = st.empty()
+                
+                if intent == "price_question":
+                    if t["code"] == 'tr':
+                        response_text = "TravelMind, sistemimizde gerçek zamanlı rezervasyon verisi bulunmadığı için canlı fiyat veya müsaitlik bilgisi sağlamaz."
+                    else:
+                        response_text = "TravelMind does not provide live pricing or availability because our system does not contain real-time booking data."
+                    answer_container.markdown(response_text)
+                    append_message({"role": "assistant", "content": response_text})
                     st.rerun()
                 
+                elif intent == "followup_pool":
+                    if not last_cards:
+                        response_text = "I do not have previous hotel results to check for a pool. Please search for a city first." if t["code"] != "tr" else "Havuz durumunu kontrol etmek için önceki bir otel sonucu yok. Lütfen önce bir şehir araması yapın."
+                    else:
+                        current_card = last_cards[selected_idx]
+                        pool_status = current_card.get("amenities", {}).get("pool", "UNKNOWN")
+                        if pool_status == "YES":
+                            response_text = "The selected hotel has pool information confirmed in our records." if t["code"] != "tr" else "Seçilen otelin havuzu olduğu sistem kayıtlarımızda doğrulanmıştır."
+                        elif pool_status == "NO":
+                            response_text = "Pool is not listed in our records for this hotel." if t["code"] != "tr" else "Sistem kayıtlarımızda bu otel için havuz görünmüyor."
+                        else:
+                            response_text = "Pool information is not clearly confirmed in our system for this hotel." if t["code"] != "tr" else "Bu otel için havuz bilgisi sistem kayıtlarımızda net olarak doğrulanmamıştır."
+                    
+                    answer_container.markdown(response_text)
+                    append_message({"role": "assistant", "content": response_text})
+                    st.rerun()
+                    
+                elif intent == "followup_breakfast":
+                    if not last_cards:
+                        response_text = "I do not have previous hotel results to check for breakfast. Please search for a city first." if t["code"] != "tr" else "Kahvaltı durumunu kontrol etmek için önceki bir otel sonucu yok. Lütfen önce bir şehir araması yapın."
+                    else:
+                        current_card = last_cards[selected_idx]
+                        bf_status = current_card.get("amenities", {}).get("breakfast", "UNKNOWN")
+                        if bf_status == "YES":
+                            response_text = "The selected hotel has breakfast confirmed in our records." if t["code"] != "tr" else "Seçilen otelin kahvaltı hizmeti olduğu sistem kayıtlarımızda doğrulanmıştır."
+                        elif bf_status == "NO":
+                            response_text = "Breakfast is not listed in our records for this hotel." if t["code"] != "tr" else "Sistem kayıtlarımızda bu otel için kahvaltı görünmüyor."
+                        else:
+                            response_text = "Breakfast information is not clearly confirmed in our system for this hotel." if t["code"] != "tr" else "Bu otel için kahvaltı bilgisi sistem kayıtlarımızda net olarak doğrulanmamıştır."
+                    
+                    answer_container.markdown(response_text)
+                    append_message({"role": "assistant", "content": response_text})
+                    st.rerun()
+
+                elif intent == "followup_other_hotel":
+                    if not last_cards:
+                        response_text = "I do not have previous hotel results to choose another hotel from. Please search for a city first." if t["code"] != "tr" else "Başka bir otel seçebileceğim önceki bir arama sonucu yok. Lütfen önce bir şehir araması yapın."
+                    else:
+                        new_idx = selected_idx + 1
+                        if new_idx >= len(last_cards):
+                            response_text = "I have shown all the hotels from the current search results. Please refine your search." if t["code"] != "tr" else "Mevcut arama sonuçlarındaki tüm otelleri gösterdim. Lütfen aramanızı daraltın."
+                        else:
+                            st.session_state.selected_hotel_index = new_idx
+                            current_card = last_cards[new_idx]
+                            hotel_name = current_card.get('hotel_name', 'UNKNOWN')
+                            score = current_card.get('travelmind_score', 0)
+                            response_text = f"Sure, the next hotel is **{hotel_name}**. It has a TravelMind score of {score:.1f}/100." if t["code"] != "tr" else f"Tabii, sıradaki otel **{hotel_name}**. Bu otelin TravelMind puanı {score:.1f}/100."
+                    
+                    answer_container.markdown(response_text)
+                    append_message({"role": "assistant", "content": response_text})
+                    st.rerun()
+                
+                else:
+                    # Generic follow-up logic using LLM
+                    from cmu_rag_answer import build_hotel_context
+                    
+                    req_hotel = None
+                    if 'router_res' in locals() and router_res:
+                        req_hotel = router_res.get("requested_hotel_name")
+                    elif 'fast_res' in locals() and fast_res:
+                        req_hotel = fast_res.get("requested_hotel_name")
+                        
+                    cards_to_include = last_cards
+                    if req_hotel:
+                        matched = [c for c in last_cards if req_hotel.lower() in c.get('hotel_name', '').lower()]
+                        if matched:
+                            cards_to_include = matched
+                    
+                    # If router didn't catch the exact name, check if prompt contains any hotel name from last_cards
+                    if len(cards_to_include) == len(last_cards):
+                        prompt_lower = prompt.lower()
+                        matched_from_prompt = [c for c in last_cards if c.get('hotel_name', '').lower() in prompt_lower]
+                        if matched_from_prompt:
+                            # If multiple match, we take the first one or all matched. All matched is safer.
+                            cards_to_include = matched_from_prompt
+                            
+                    context_str = ""
+                    for i, card in enumerate(cards_to_include, start=1):
+                        context_str += build_hotel_context(prompt, card, i) + "\n\n"
+                        
+                    generator = generate_followup_answer(
+                        query=prompt, 
+                        context_str=context_str, 
+                        lang_code=t["code"], 
+                        chat_history=st.session_state.messages[:-1]
+                    )
+                    full_answer = ""
+                    for chunk in generator:
+                        if isinstance(chunk, dict) and chunk["type"] == "answer":
+                            full_answer += chunk["content"]
+                        elif not isinstance(chunk, dict):
+                            full_answer += chunk
+                                
+                    from answer_validator import validate_answer
+                    validation = validate_answer(full_answer, last_cards, "follow_up", None, t["code"])
+                    final_display = validation["sanitized_answer"]
+                    
+                    final_display = sanitize_before_render(final_display)
+                    if final_display is None:
+                        from cmu_rag_answer import safe_card_based_fallback_answer
+                        final_display = safe_card_based_fallback_answer(
+                            user_query=prompt,
+                            hotel_cards=cards_to_include,
+                            language=t["code"]
+                        )
+                    
+                    answer_container.markdown(final_display, unsafe_allow_html=True)
+                    append_message({"role": "assistant", "content": final_display})
+                    st.rerun()
+
             else:
-                results = search(prompt, location_filter=effective_location, filters=filters, top_k_hotels=4)
+                results = search(prompt, location_filter=effective_location, filters=None, top_k_hotels=12)
                 
                 if not results:
                     response_text = t["not_found"].format(effective_location or '')
                     st.markdown(response_text)
-                    st.session_state.messages.append({"role": "assistant", "content": response_text})
+                    append_message({"role": "assistant", "content": response_text})
                     st.rerun()
                 else:
-                    context_parts = []
-                    for i, res in enumerate(results):
-                        meta = res["metadata"]
-                        score_data = calculate_recommendation_score(res)
-                        final_score = score_data["score"]
-                        
-                        st.markdown("---")
-                        st.markdown(f"#### 🏨 {meta.get('hotel_name', t['unknown_hotel'])}")
-                        c1, c2 = st.columns([3, 1])
-                        with c1:
-                            st.write(f"📍 **{meta.get('location', '')}** | {t['class_label']}: {meta.get('hotel_class', '')}")
-                            st.write(f"🛠️ **{t['amenities_label']}:** {', '.join(meta.get('amenities', [])[:6])}")
-                        with c2:
-                            st.metric(t["score_label"], f"%{final_score:.1f}")
-                            booking_url = f"https://www.booking.com/searchresults.html?ss={meta.get('hotel_name', '').replace(' ', '+')}"
-                            st.markdown(f"👉 **[{t['book_now']}]({booking_url})**", unsafe_allow_html=True)
-                            
-                        strengths = build_strengths(res, score_data)
-                        cautions = build_cautions(res)
-                        
-                        context_str = f"Otel {i+1}: {meta.get('hotel_name')}\n"
-                        context_str += f"Lokasyon: {meta.get('location')}\n"
-                        context_str += f"Puan: %{final_score:.1f}\n"
-                        context_str += f"Öne Çıkanlar: {', '.join(strengths) if strengths else '-'}\n"
-                        context_str += f"Dikkat Edilmesi Gerekenler: {', '.join(cautions) if cautions else '-'}\n"
-                        context_str += f"Açıklama: {res['text']}\n"
-                        context_parts.append(context_str)
-
-                    full_context = "\n\n".join(context_parts)
-                    st.markdown("---")
+                    cards_json = build_hotel_cards(
+                        results=results,
+                        user_query=prompt,
+                        query_requirements=query_requirements,
+                        requested_location=locals().get("effective_location"),
+                        effective_scores=locals().get("effective_scores"),
+                    )
+                    sorted_cards = sorted(cards_json, key=lambda x: x.get("rank_score", 0.0), reverse=True)[:4]
                     
                     answer_container = st.empty()
-                    generator = generate_llm_answer(prompt, full_context, st.session_state.messages[:-1], effective_location, t["code"])
-                    full_answer = ""
-                    think_text = ""
-                    for chunk in generator:
-                        if isinstance(chunk, dict):
-                            if chunk["type"] == "think":
-                                think_text += chunk["content"]
-                                answer_container.markdown(f"<div style='color: #888; font-style: italic; font-size: 0.9em; margin-bottom: 10px;'>🤔 Düşünüyor...<br>{think_text}</div>", unsafe_allow_html=True)
-                            else:
-                                full_answer += chunk["content"]
-                                answer_container.markdown(full_answer, unsafe_allow_html=True)
-                        else:
-                            full_answer += chunk
-                            answer_container.markdown(full_answer, unsafe_allow_html=True)
                     
-                    st.session_state.messages.append({
+                    # Generate full answer silently with spinner
+                    if True:
+                        from cmu_rag_answer import build_hotel_context
+                        hotel_context_str = ""
+                        for i, result in enumerate(sorted_cards, start=1):
+                            hotel_context_str += build_hotel_context(prompt, result, i) + "\n\n"
+                            
+                        generator = generate_llm_answer(
+                            query=prompt, 
+                            hotel_context_str=hotel_context_str, 
+                            chat_history=st.session_state.messages[:-1], 
+                            location=effective_location, 
+                            lang_code=t["code"],
+                            hotel_cards=sorted_cards
+                        )
+                        full_answer = ""
+                        for chunk in generator:
+                            if isinstance(chunk, dict) and chunk["type"] == "answer":
+                                full_answer += chunk["content"]
+                            elif not isinstance(chunk, dict):
+                                full_answer += chunk
+                                
+                        validation = validate_answer(full_answer, sorted_cards, "hotel_search", effective_location, t["code"])
+                        final_display = validation["sanitized_answer"]
+                        
+                        final_display = sanitize_before_render(final_display)
+                        if final_display is None:
+                            from cmu_rag_answer import safe_card_based_fallback_answer
+                            final_display = safe_card_based_fallback_answer(
+                                user_query=prompt,
+                                hotel_cards=sorted_cards,
+                                query_requirements=query_requirements,
+                                city=effective_location,
+                                language=t["code"]
+                            )
+                        
+                    # Update session state with the new context immediately
+                    st.session_state["last_hotel_cards"] = sorted_cards
+                    st.session_state["selected_hotel_index"] = 0
+                    if effective_location:
+                        st.session_state["last_search_city"] = effective_location
+                    if sorted_cards:
+                        st.session_state["last_answered_hotel_name"] = sorted_cards[0].get("hotel_name", "UNKNOWN")
+                        
+                    print(f"[STATE] last_hotel_cards_count={len(sorted_cards)} selected_hotel_index=0 last_search_city={effective_location}")
+
+                    answer_container.markdown(final_display, unsafe_allow_html=True)
+                    st.markdown("---")
+                    
+                    for card in sorted_cards:
+                        st.markdown(f"#### 🏨 {card.get('hotel_name', t['unknown_hotel'])}")
+                        c1, c2 = st.columns([2.5, 1.5])
+                        with c1:
+                            raw_class = card.get('hotel_class', '')
+                            if not raw_class or str(raw_class).lower() in ["nan", "none", "unknown", "null", ""]:
+                                display_class = "Belirtilmemiş" if t['code'] == 'tr' else "Not Specified"
+                            else:
+                                display_class = raw_class
+                            st.write(f"📍 **{card.get('location', '')}** | {t['class_label']}: {display_class}")
+                            
+                            phone_val = card.get('phone', 'UNKNOWN')
+                            if phone_val and phone_val != "UNKNOWN" and phone_val.lower() != "none" and phone_val.lower() != "null":
+                                phone_label = "Telefon" if t['code'] == 'tr' else "Phone"
+                                st.write(f"📞 **{phone_label}:** {phone_val}")
+
+                            room_info_dict = card.get("room_info", {})
+                            room_types = room_info_dict.get("room_types", [])
+                            has_suite = room_info_dict.get("suite") == "YES"
+                            
+                            rooms_list = []
+                            if has_suite:
+                                rooms_list.append("Suite (Suit Oda)" if t['code'] == 'tr' else "Suite")
+                            
+                            if room_types:
+                                for rt in room_types:
+                                    if "suite" not in str(rt).lower():
+                                        rooms_list.append(str(rt))
+                                        
+                            if rooms_list:
+                                rooms_label = "Oda Tipleri" if t['code'] == 'tr' else "Room Types"
+                                st.write(f"🛏️ **{rooms_label}:** {', '.join(rooms_list)}")
+                            
+                            confirmed = []
+                            for am_key, am_val in card.get('amenities', {}).items():
+                                if am_key == 'other': continue
+                                if am_val == 'YES':
+                                    confirmed.append(am_key.replace('_', ' ').capitalize())
+                                    
+                            if confirmed:
+                                st.write(f"🛠️ **{t['amenities_label']}:** {', '.join(confirmed)}")
+                            else:
+                                empty_msg = "Mevcut veri setinde doğrulanmış olanak bilgisi yok." if t['code'] == 'tr' else "Confirmed amenities: Not available in the current dataset."
+                                st.write(f"🛠️ **{t['amenities_label']}:** {empty_msg}")
+                                
+                            for req_key, req_status in query_requirements.items():
+                                if req_status == "REQUIRED":
+                                    sat = card.get("requirement_satisfaction", {}).get(req_key, "UNKNOWN")
+                                    if sat == "UNKNOWN":
+                                        warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
+                                        st.write(f"⚠️ **{warn_msg}**")
+                        with c2:
+                            st.metric(t["score_label"], f"{card.get('travelmind_score', 0):.1f}/100")
+                            m_type = card.get('map_link_type', 'UNKNOWN')
+                            m_link = card.get('map_link', '')
+                            if m_type == 'exact':
+                                m_label = "Haritada Gör" if t['code'] == 'tr' else "View on Map"
+                                st.markdown(f"👉 **[{m_label}]({m_link})**", unsafe_allow_html=True)
+                            elif m_type == 'search':
+                                m_label = "Haritada Ara" if t['code'] == 'tr' else "Search on Map"
+                                st.markdown(f"👉 **[{m_label}]({m_link})**", unsafe_allow_html=True)
+                        st.markdown("---")
+                    
+                    st.session_state.last_hotel_cards = sorted_cards
+                    st.session_state.selected_hotel_index = 0
+                    
+                    append_message({
                         "role": "assistant",
-                        "content": full_answer,
-                        "hotels": results
+                        "content": final_display,
+                        "hotels": sorted_cards
                     })
                     st.rerun()
 

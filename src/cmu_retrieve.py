@@ -4,15 +4,14 @@ import sqlite3
 import os
 from pathlib import Path
 
-# Remove huggingface/transformers environment variables as they are no longer needed
 import numpy as np
-import foundry_local_sdk as foundry
-from foundry_local_sdk import Configuration
+import torch
+from sentence_transformers import SentenceTransformer
 
 DATA_DIR = Path("data")
 DB_PATH = DATA_DIR / "cmu_travelmind.db"
 
-MODEL_ID = "qwen3-embedding-0.6b-generic-cpu:1"
+MODEL_NAME = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 TOP_K_HOTELS = 8
 RAW_CANDIDATE_MULTIPLIER = 8
@@ -82,17 +81,18 @@ def load_chunks_from_db():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
+    cur.execute("SELECT COUNT(*) FROM chunks")
+    total_rows = cur.fetchone()[0]
+
     cur.execute("""
         SELECT chunk_id, chunk_type, text, metadata_json, embedding_json
         FROM chunks
     """)
-    rows = cur.fetchall()
-    conn.close()
 
     records = []
-    embeddings = []
+    embeddings = None
 
-    for chunk_id, chunk_type, text, metadata_json, embedding_json in rows:
+    for i, (chunk_id, chunk_type, text, metadata_json, embedding_json) in enumerate(cur):
         records.append(
             {
                 "chunk_id": chunk_id,
@@ -101,39 +101,22 @@ def load_chunks_from_db():
                 "metadata": json.loads(metadata_json),
             }
         )
-        embeddings.append(json.loads(embedding_json))
+        emb_list = json.loads(embedding_json)
+        if embeddings is None:
+            embeddings = np.empty((total_rows, len(emb_list)), dtype=np.float32)
+        embeddings[i] = emb_list
+        
+    conn.close()
 
-    embeddings = np.array(embeddings, dtype=np.float32)
     return records, embeddings
 
 def get_or_load_embedding_model():
     global _cached_model
     if _cached_model is None:
         if DEBUG:
-            print("Foundry Local Embedding modeli yukleniyor...")
-        
-        # Sadece manager calisiyorsa baslat
-        if not hasattr(foundry.FoundryLocalManager, 'instance') or foundry.FoundryLocalManager.instance is None:
-            config = Configuration(app_name="TravelMindRAG")
-            foundry.FoundryLocalManager.initialize(config)
-        
-        manager = foundry.FoundryLocalManager.instance
-        models = manager.catalog.list_models()
-        
-        model = manager.catalog.get_model(MODEL_ID)
-        if not model:
-            for m in models:
-                if m.id == MODEL_ID or m.alias == MODEL_ID:
-                    model = manager.catalog.get_model(m.alias)
-                    break
-                    
-        if not model:
-            raise ValueError(f"Model {MODEL_ID} bulunamadi!")
-            
-        if not model.is_loaded:
-            model.load()
-            
-        _cached_model = model.get_embedding_client()
+            print("SentenceTransformers Embedding modeli yukleniyor...")
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        _cached_model = SentenceTransformer(MODEL_NAME, device=device)
     return _cached_model
 
 def get_or_load_chunks():
@@ -152,82 +135,48 @@ def extract_total_review_count_from_text(text):
         return match.group(1)
     return ""
 
-def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS):
+def get_full_hotel_metadata(hotel_name):
+    records, _ = get_or_load_chunks()
+    target_lower = str(hotel_name).lower().strip()
+    for r in records:
+        if r.get("chunk_type") == "hotel_profile":
+            meta = r.get("metadata", {})
+            if str(meta.get("hotel_name", "")).lower().strip() == target_lower:
+                return meta
+    return {}
+
+def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS, requested_hotel_name=None):
     model = get_or_load_embedding_model()
     records, embeddings = get_or_load_chunks()
 
     expanded_query = expand_query(query)
 
-    response = model.generate_embedding(expanded_query)
-    query_embedding = np.array(response.data[0].embedding, dtype=np.float32)
+    query_embedding = model.encode(expanded_query, convert_to_numpy=True).astype(np.float32)
 
+    # We no longer hard-filter based on requirements here.
+    # Instead, we retrieve the top candidates and apply ranking penalties 
+    # for missing or unknown requirements in hotel_card_builder.py.
     vector_scores = embeddings @ query_embedding
 
-    hard_requirements = {
-        'pool': False,
-        'wifi': False,
-        'breakfast': False,
-        'pet': False,
-        'gym': False,
-        'parking': False,
-        'restaurant': False,
-        'bar': False,
-        'spa': False,
-        'room_service': False,
-        'business_center': False,
-        'tv': False,
-        'smoke_free': False
-    }
-    
-    if filters:
-        for k, v in filters.items():
-            if v and k in hard_requirements:
-                hard_requirements[k] = True
-
     scored_records = []
+
+    req_hotel_norm = normalize_text(requested_hotel_name) if requested_hotel_name else None
+
+    filter_location = normalize_text(location_filter) if location_filter else None
+    city_part = filter_location.split(',')[0].strip() if filter_location else None
 
     for index, record in enumerate(records):
         metadata = record.get("metadata", {})
         if location_filter:
             record_location = normalize_text(metadata.get("location", ""))
-            filter_location = normalize_text(location_filter)
-            city_part = filter_location.split(',')[0].strip()
             if city_part not in record_location and filter_location not in record_location:
                 continue
 
-        failed_req = False
-        if any(hard_requirements.values()):
-            record_amenities = [str(a).lower() for a in metadata.get("amenities", [])]
-            am_str = " ".join(record_amenities)
-            if hard_requirements['pool'] and not any(w in am_str for w in ['pool', 'havuz', 'yüzme']):
-                failed_req = True
-            if hard_requirements['wifi'] and not any(w in am_str for w in ['wifi', 'wi-fi', 'internet', 'kablosuz']):
-                failed_req = True
-            if hard_requirements['breakfast'] and not any(w in am_str for w in ['breakfast', 'kahvaltı']):
-                failed_req = True
-            if hard_requirements['pet'] and not any(w in am_str for w in ['pet', 'evcil', 'köpek']):
-                failed_req = True
-            if hard_requirements['gym'] and not any(w in am_str for w in ['fitness', 'gym', 'spor', 'egzersiz']):
-                failed_req = True
-            if hard_requirements['parking'] and not any(w in am_str for w in ['parking', 'otopark', 'park']):
-                failed_req = True
-            if hard_requirements['restaurant'] and not any(w in am_str for w in ['restaurant', 'restoran', 'yemek']):
-                failed_req = True
-            if hard_requirements['bar'] and not any(w in am_str for w in ['bar', 'lounge']):
-                failed_req = True
-            if hard_requirements['spa'] and not any(w in am_str for w in ['spa', 'masaj']):
-                failed_req = True
-            if hard_requirements['room_service'] and not any(w in am_str for w in ['room service', 'oda servisi']):
-                failed_req = True
-            if hard_requirements['business_center'] and not any(w in am_str for w in ['business center', 'iş merkezi']):
-                failed_req = True
-            if hard_requirements['tv'] and not any(w in am_str for w in ['tv', 'televizyon']):
-                failed_req = True
-            if hard_requirements['smoke_free'] and not any(w in am_str for w in ['smoke-free', 'non-smoking', 'sigara içilmez']):
-                failed_req = True
-
-        if failed_req:
-            continue
+        if req_hotel_norm:
+            rec_hotel_norm = normalize_text(metadata.get("hotel_name", ""))
+            # Fuzzy match or subset match for the hotel name
+            if req_hotel_norm not in rec_hotel_norm and rec_hotel_norm not in req_hotel_norm:
+                continue
 
         vector_score = float(vector_scores[index])
         chunk_type = record["chunk_type"]

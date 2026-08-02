@@ -78,19 +78,19 @@ def missing_location_message(lang_code: str) -> str:
 
 def unsupported_location_message(lang_code: str) -> str:
     if lang_code == "tr":
-        return "Bu konum mevcut CMU TripAdvisor veri setimde bulunmuyor. Şu anda yalnızca ABD'deki belirli şehirler için otel önerisi yapabiliyorum. Desteklenen bazı şehirler: New York City, Chicago, San Francisco, Boston, Washington DC, Los Angeles, Seattle, Dallas ve Philadelphia."
-    return "This location is not available in my current CMU TripAdvisor dataset. I can currently recommend hotels only for selected U.S. cities, such as New York City, Chicago, San Francisco, Boston, Washington DC, Los Angeles, Seattle, Dallas, and Philadelphia."
+        return "Bu konum sistem kayıtlarımızda bulunmamaktadır. Şu anda yalnızca ABD'deki belirli şehirler için otel önerisi yapabiliyorum. Desteklenen bazı şehirler: New York City, Chicago, San Francisco, Boston, Washington DC, Los Angeles, Seattle, Dallas ve Philadelphia."
+    return "This location is not currently supported by our system. We currently recommend hotels only for selected U.S. cities, such as New York City, Chicago, San Francisco, Boston, Washington DC, Los Angeles, Seattle, Dallas, and Philadelphia."
 
 def out_of_scope_message(lang_code: str) -> str:
     if lang_code == "tr":
         return "TravelMind şu anda yalnızca otel ve konaklama seçimi için tasarlandı. Uçak bileti, vize, restoran veya gezi rotası önerisi üretmiyorum. Ancak belirli bir şehir için otel tercihlerini yazarsan yardımcı olabilirim."
-    return "TravelMind is currently designed only for hotel and accommodation selection. I do not provide flight, visa, restaurant, or itinerary recommendations. If you share a city and your hotel preferences, I can help with accommodation options."
+    return "TravelMind is currently designed exclusively for hotel and accommodation recommendations. I do not provide flight, visa, restaurant, or itinerary suggestions. If you share a city and your hotel preferences, I'll be glad to help with accommodation options."
 
 
 def no_result_message(lang_code: str) -> str:
     if lang_code == "tr":
-        return "İstenen konum için CMU TripAdvisor veri setinde uygun otel sonucu bulunamadı."
-    return "No suitable hotel result was found for the requested location in the CMU TripAdvisor dataset."
+        return "İstenen konum için sistemimizde uygun otel sonucu bulunamadı."
+    return "We could not find a suitable hotel result for the requested location in our system."
 
 
 def empty_query_message(lang_code: str) -> str:

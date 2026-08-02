@@ -25,7 +25,7 @@ def simulate_stream(chunks):
 
 def consume_stream(chunks):
     """Consume the stream_and_strip_think generator and return results."""
-    gen = stream_and_strip_think(simulate_stream(chunks), "tr")
+    gen = stream_and_strip_think(simulate_stream(chunks), "en")
     return list(gen)
 
 def test_single_chunk_think():

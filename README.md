@@ -16,9 +16,10 @@ Our journey in building TravelMind has gone through several critical phases, evo
 - **Numpy Vector Store:** The semantic vectors were saved as local `.npy` files for cosine similarity calculations.
 - **Legacy Database (`travelmind_old_kaggle.db`):** All metadata and chunks were stored in a massive SQLite database. *(Note: Due to GitHub file limits, this legacy database is now split and archived in this repo).*
 
-### Phase 3: The Modern Local RAG Architecture (Current)
-- **Foundry Local SDK & Qwen3:** To eliminate API latency, `APIConnectionError` issues, and dependency on external servers, we migrated the entire embedding and LLM generation pipeline to local hardware using **Foundry Local SDK** and the highly efficient **Qwen3-embedding-0.6b** model.
-- **New SQLite Database:** We rebuilt the database (`cmu_travelmind.db`) to store JSON-serialized metadata and Qwen3 vector embeddings, massively improving read/write speeds and structural integrity.
+### Phase 3: The Hybrid Local RAG Architecture (Current)
+- **Massive Scale Engineering:** The initial project plan assumed a small, experimental dataset (5-10 documents). Because TravelMind operates on a massive real-world dataset (over **224,500** chunks), generating embeddings via an LLM endpoint would take hours. Therefore, we made the architectural decision to retain the highly-optimized **PyTorch & Sentence-Transformers (`MiniLM`)** pipeline for ultra-fast embedding generation and vector retrieval.
+- **Foundry Local for LLM Chat:** To eliminate API latency, `APIConnectionError` issues, and dependency on external servers, we integrated the **Foundry Local SDK** exclusively for the Generation (Chat) phase. The local LLM processes the retrieved context offline, ensuring 100% data privacy and zero network calls.
+- **New SQLite Database:** We rebuilt the database (`cmu_travelmind.db`) to store JSON-serialized metadata and vector embeddings, massively improving read/write speeds and structural integrity compared to the legacy `.npy` files.
 
 ### Phase 4: Prompt Engineering & Guardrails
 - **Zero Hallucination Policy:** We engineered strict LLM system prompts that force the AI to *only* answer using the provided database context. 
@@ -32,7 +33,7 @@ Our journey in building TravelMind has gone through several critical phases, evo
 ---
 
 ## ✨ Core Features
-- **Local AI Models:** Completely self-hosted vector embeddings and LLM inference ensuring 100% data privacy.
+- **Hybrid Local AI Models:** Blazing-fast PyTorch embeddings combined with self-hosted Foundry Local LLM inference, ensuring 100% data privacy.
 - **Multi-language Support:** UI and NLP processing natively supported in 6 languages.
 - **Theme-responsive UI:** Streamlit frontend adapts to light and dark themes seamlessly.
 - **Hallucination Guardrails:** Strict prompt engineering ensures the AI never guesses outside of the provided context.
