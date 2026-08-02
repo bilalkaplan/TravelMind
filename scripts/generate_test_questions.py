@@ -1,5 +1,9 @@
 import random
 import json
+import os
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+test_suite_path = os.path.join(base_dir, 'tests', 'test_suite.json')
 
 cities_tr = ["New York City", "Chicago", "San Francisco", "Boston", "Washington DC", "San Diego", "Dallas", "Houston", "Denver", "Los Angeles", "Seattle", "San Antonio", "Phoenix", "Philadelphia", "Memphis", "Baltimore", "San Jose", "Detroit", "Austin", "Indianapolis", "Jacksonville", "Charlotte", "Columbus", "Fort Worth", "El Paso"]
 
@@ -85,7 +89,7 @@ if __name__ == "__main__":
     for i in range(2):
         suites[f"test_{i+6}_en"] = en_questions[i*25:(i+1)*25]
         
-    with open("tests/test_suite.json", "w", encoding="utf-8") as f:
-        json.dump(suites, f, ensure_ascii=False, indent=4)
+    with open(test_suite_path, "w", encoding="utf-8") as f:
+        json.dump(suites, f, indent=4, ensure_ascii=False)
         
     print("200 logical questions generated and saved to tests/test_suite.json")

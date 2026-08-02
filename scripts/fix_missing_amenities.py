@@ -1,13 +1,20 @@
 import json
 import pandas as pd
 import re
+import os
+
+base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+raw_json_path = os.path.join(base_dir, 'data', 'raw', 'hotel_enriched_raw.json')
+reviews_csv_path = os.path.join(base_dir, 'data', 'processed', 'cmu_reviews_reliable.csv')
+hotels_csv_path = os.path.join(base_dir, 'data', 'processed', 'cmu_hotels_reliable.csv')
+metadata_json_path = os.path.join(base_dir, 'data', 'cmu_hotel_metadata.json')
 
 print("Loading data...")
-with open('data/raw/hotel_enriched_raw.json', 'r', encoding='utf-8') as f:
+with open(raw_json_path, 'r', encoding='utf-8') as f:
     enriched_data = json.load(f)
 
-reviews_df = pd.read_csv('data/processed/cmu_reviews_reliable.csv')
-hotels_df = pd.read_csv('data/processed/cmu_hotels_reliable.csv')
+reviews_df = pd.read_csv(reviews_csv_path)
+hotels_df = pd.read_csv(hotels_csv_path)
 
 def extract_with_regex(context):
     phone = None
@@ -78,10 +85,10 @@ for hotel_key, data in enriched_data.items():
 print(f"Total missing initially: {missing_count}")
 print(f"Total fixed using reviews: {fixed_count}")
 
-with open('data/raw/hotel_enriched_raw.json', 'w', encoding='utf-8') as f:
+with open(raw_json_path, 'w', encoding='utf-8') as f:
     json.dump(enriched_data, f, ensure_ascii=False, indent=2)
 
-with open('data/cmu_hotel_metadata.json', 'w', encoding='utf-8') as f:
+with open(metadata_json_path, 'w', encoding='utf-8') as f:
     json.dump(enriched_data, f, ensure_ascii=False, indent=2)
 
 print("Saved updated metadata to hotel_enriched_raw.json and cmu_hotel_metadata.json.")

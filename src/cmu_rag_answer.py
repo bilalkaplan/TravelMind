@@ -31,6 +31,7 @@ from travelmind_scoring import (
     build_strengths,
     build_cautions,
 )
+from language_utils import (
     detect_language,
     language_name,
     no_result_message,
