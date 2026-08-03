@@ -1,5 +1,143 @@
 
-from travelmind_scoring import calculate_travelmind_score
+from travelmind_scoring import (
+    calculate_travelmind_score,
+    normalize_query_requirements,
+    normalize_text,
+)
+
+
+REQUIRED_MATCH_BOOST = 125.0
+REQUIRED_MISSING_PENALTY = 125.0
+REQUIRED_UNKNOWN_PENALTY = 60.0
+OPTIONAL_MATCH_BOOST = 25.0
+
+AMENITY_FEATURE_KEYWORDS = {
+    "wifi": ("wifi", "wi fi", "internet", "wireless"),
+    "breakfast": ("breakfast", "kahvaltı", "morning meal"),
+    "pool": ("pool", "havuz", "swimming"),
+    "wheelchair_accessible": (
+        "wheelchair",
+        "accessible",
+        "handicap",
+        "disabled",
+        "engelli",
+    ),
+    "parking": ("parking", "park", "valet", "garage", "otopark"),
+    "pet_friendly": ("pet", "dog", "cat", "evcil"),
+}
+
+ROOM_FEATURE_KEYWORDS = {
+    "single_room": ("single", "tek"),
+    "double_room": ("double", "çift", "twin", "king", "queen", "full"),
+    "suite": ("suite", "suit", "presidential", "kral"),
+}
+
+
+def _has_metadata_value(value) -> bool:
+    """Whether a retrieval value contains information worth overriding with."""
+    if value is None:
+        return False
+    if isinstance(value, (list, tuple, set, dict)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().casefold() not in {"", "unknown", "none", "null", "nan"}
+    return True
+
+
+def merge_hotel_metadata(full_metadata: dict, chunk_metadata: dict) -> dict:
+    """Prefer retrieval fields only when they are actually populated.
+
+    Some installations have an older vector DB whose rows contain empty
+    ``amenities`` or room lists.  Those empty containers must not erase the
+    newer enriched hotel profile loaded from JSON.
+    """
+    merged = dict(full_metadata or {})
+    for key, value in (chunk_metadata or {}).items():
+        if key in {"amenities", "room_types", "booking_room_types"}:
+            existing = merged.get(key)
+            if _has_metadata_value(existing) and _has_metadata_value(value):
+                merged[key] = _merge_unique_text_values(existing, value)
+                continue
+        if key not in merged or _has_metadata_value(value):
+            merged[key] = value
+    return merged
+
+
+def _merge_unique_text_values(*collections) -> list:
+    merged = []
+    seen = set()
+    for collection in collections:
+        if isinstance(collection, dict):
+            collection = [
+                key
+                for key, value in collection.items()
+                if str(value).strip().upper() in {"YES", "TRUE", "1"}
+            ]
+        elif isinstance(collection, str):
+            collection = [collection]
+        if not isinstance(collection, (list, tuple, set)):
+            continue
+        for value in collection:
+            text = str(value).strip()
+            normalized = normalize_text(text)
+            if not text or not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            merged.append(text)
+    return merged
+
+
+def get_combined_room_types(metadata: dict) -> list:
+    return _merge_unique_text_values(
+        metadata.get("room_types", []),
+        metadata.get("booking_room_types", []),
+    )
+
+
+def _feature_status(values, keywords) -> str:
+    """Return YES/NO/UNKNOWN while preserving explicit dictionary states."""
+
+    if isinstance(values, dict):
+        matching_states = []
+        for key, value in values.items():
+            normalized_key = normalize_text(key)
+            if not any(keyword in normalized_key for keyword in keywords):
+                continue
+            normalized_value = str(value).strip().upper()
+            if normalized_value in {"YES", "TRUE", "1"} or value is True:
+                matching_states.append("YES")
+            elif normalized_value in {"NO", "FALSE", "0"} or value is False:
+                matching_states.append("NO")
+            else:
+                matching_states.append("UNKNOWN")
+        if "YES" in matching_states:
+            return "YES"
+        if "NO" in matching_states:
+            return "NO"
+        return "UNKNOWN"
+
+    if isinstance(values, str):
+        values = [values] if values.strip() else []
+    if not isinstance(values, (list, tuple, set)) or not values:
+        return "UNKNOWN"
+    normalized_values = normalize_text(" ".join(str(value) for value in values))
+    return "YES" if any(keyword in normalized_values for keyword in keywords) else "NO"
+
+
+def evaluate_hotel_features(metadata: dict) -> dict:
+    amenities = metadata.get("amenities", [])
+    room_types = get_combined_room_types(metadata)
+    statuses = {
+        key: _feature_status(amenities, keywords)
+        for key, keywords in AMENITY_FEATURE_KEYWORDS.items()
+    }
+    statuses.update(
+        {
+            key: _feature_status(room_types, keywords)
+            for key, keywords in ROOM_FEATURE_KEYWORDS.items()
+        }
+    )
+    return statuses
 
 def extract_boolean_feature(amenities: list, keywords: list) -> str:
     """
@@ -7,14 +145,25 @@ def extract_boolean_feature(amenities: list, keywords: list) -> str:
     Returns 'YES' if found, 'NO' if amenities list exists but not found, 
     and 'UNKNOWN' if amenities list is completely missing or empty.
     """
-    if not amenities:
-        return "UNKNOWN"
-    
-    am_str = " ".join([str(a).lower() for a in amenities])
-    for kw in keywords:
-        if kw in am_str:
-            return "YES"
-    return "NO"
+    normalized_keywords = tuple(normalize_text(keyword) for keyword in keywords)
+    return _feature_status(amenities, normalized_keywords)
+
+
+def _locations_match(requested_location, actual_location) -> bool:
+    requested = normalize_text(requested_location)
+    actual = normalize_text(actual_location)
+    if not requested or not actual:
+        return True
+    requested_city = requested.split(",", 1)[0].strip()
+    return requested in actual or (requested_city and requested_city in actual)
+
+
+def _hotel_names_match(requested_name, actual_name) -> bool:
+    requested = normalize_text(requested_name)
+    actual = normalize_text(actual_name)
+    if not requested:
+        return True
+    return requested == actual or requested in actual or actual in requested
 
 
 def build_hotel_cards(
@@ -39,6 +188,12 @@ def build_hotel_cards(
         
     if requested_location is None:
         requested_location = kwargs.get("location") or kwargs.get("location_filter")
+
+    requested_hotel_name = kwargs.get("requested_hotel_name")
+    normalized_requirements = normalize_query_requirements(
+        query_requirements,
+        user_query,
+    )
         
     hotel_cards = []
     from cmu_retrieve import get_full_hotel_metadata
@@ -52,76 +207,56 @@ def build_hotel_cards(
         # We don't want to show empty hotels
         if hotel_name == "UNKNOWN" or not hotel_name:
             continue
+        if requested_hotel_name and not _hotel_names_match(
+            requested_hotel_name, hotel_name
+        ):
+            continue
 
         # Merge full profile metadata so phone, amenities, and booking_room_types are never lost
-        full_meta = get_full_hotel_metadata(hotel_name)
-        metadata = {**full_meta, **chunk_metadata}
-        
-        # Inject merged metadata back into res so calculate_travelmind_score uses it!
+        metadata_location = (
+            chunk_metadata.get("location")
+            or chunk_metadata.get("city")
+            or requested_location
+        )
+        full_meta = get_full_hotel_metadata(
+            hotel_name,
+            location=metadata_location,
+            hotel_id=chunk_metadata.get("hotel_id"),
+        )
+        metadata = merge_hotel_metadata(full_meta, chunk_metadata)
+        actual_location = metadata.get("location") or metadata.get("city")
+        if requested_location and actual_location and not _locations_match(
+            requested_location, actual_location
+        ):
+            continue
+        if not metadata.get("location") and actual_location:
+            metadata["location"] = actual_location
+
+        # Inject merged metadata back into res so scoring and explanations use it.
         res_for_scoring = res.copy()
         res_for_scoring["metadata"] = metadata
-        
-        # Get the real clamped score from the backend
-        score_data = calculate_travelmind_score(user_query, res_for_scoring)
-        base_score = score_data.get("travelmind_score", 0)
-        
-        amenities = metadata.get("amenities", [])
-        
-        # Safe extraction of amenities
-        wifi = extract_boolean_feature(amenities, ["wifi", "wi-fi", "internet", "wireless"])
-        breakfast = extract_boolean_feature(amenities, ["breakfast", "kahvaltı", "morning meal"])
-        pool = extract_boolean_feature(amenities, ["pool", "havuz", "swimming"])
-        wheelchair = extract_boolean_feature(amenities, ["wheelchair", "accessible", "handicap", "disabled", "engelli"])
-        parking = extract_boolean_feature(amenities, ["parking", "park", "valet"])
-        pet_friendly = extract_boolean_feature(amenities, ["pet", "dog", "cat", "evcil"])
-        
 
-        
-        # Calculate requirement satisfaction and penalty
+        amenities = metadata.get("amenities", [])
+        feature_map = evaluate_hotel_features(metadata)
+        wifi = feature_map["wifi"]
+        breakfast = feature_map["breakfast"]
+        pool = feature_map["pool"]
+        wheelchair = feature_map["wheelchair_accessible"]
+        parking = feature_map["parking"]
+        pet_friendly = feature_map["pet_friendly"]
+
+        # Calculate requirement satisfaction and ranking signals.
         requirement_satisfaction = {}
-        penalty = 0
         matches = 0
         missing = 0
         unknowns = 0
-        
-        normalized_text = str(text).lower()
-        room_types = metadata.get("room_types", metadata.get("booking_room_types", []))
-        if isinstance(room_types, str):
-            room_types = [room_types]
-        
-        room_types_lower = [str(r).lower() for r in room_types]
-        
-        has_single_room = "UNKNOWN"
-        if any("single" in r or "tek" in r for r in room_types_lower):
-            has_single_room = "YES"
-        elif "single room" in normalized_text or "tek kişilik" in normalized_text:
-            has_single_room = "YES"
-            
-        has_double_room = "UNKNOWN"
-        if any("double" in r or "çift" in r or "twin" in r or "king" in r or "queen" in r for r in room_types_lower):
-            has_double_room = "YES"
-        elif "double room" in normalized_text or "çift kişilik" in normalized_text or "iki kişilik" in normalized_text:
-            has_double_room = "YES"
-        
-        has_suite = "UNKNOWN"
-        if any("suite" in r or "suit" in r or "kral" in r or "king suite" in r for r in room_types_lower):
-            has_suite = "YES"
-        elif "suite" in normalized_text or "suit oda" in normalized_text or "kral dairesi" in normalized_text:
-            has_suite = "YES"
+        optional_matches = 0
+        room_types = get_combined_room_types(metadata)
+        has_single_room = feature_map["single_room"]
+        has_double_room = feature_map["double_room"]
+        has_suite = feature_map["suite"]
 
-        # Map fields to extracted values
-        feature_map = {
-            "breakfast": breakfast,
-            "pool": pool,
-            "wifi": wifi,
-            "wheelchair_accessible": wheelchair,
-            "parking": parking,
-            "single_room": has_single_room,
-            "double_room": has_double_room,
-            "suite": has_suite
-        }
-        
-        for req, status in query_requirements.items():
+        for req, status in normalized_requirements.items():
             if status == "REQUIRED":
                 val = feature_map.get(req, "UNKNOWN")
                 if val == "YES":
@@ -130,15 +265,14 @@ def build_hotel_cards(
                 elif val == "NO":
                     requirement_satisfaction[req] = "MISSING"
                     missing += 1
-                    penalty += 25
                 else:
                     requirement_satisfaction[req] = "UNKNOWN"
                     unknowns += 1
-                    penalty += 10
             elif status == "OPTIONAL":
                 val = feature_map.get(req, "UNKNOWN")
                 if val == "YES":
                     requirement_satisfaction[req] = "MATCH"
+                    optional_matches += 1
                 elif val == "NO":
                     requirement_satisfaction[req] = "MISSING"
                 else:
@@ -147,11 +281,22 @@ def build_hotel_cards(
                 requirement_satisfaction[req] = "NOT_REQUESTED"
                 
         # Calculate scores
-        travelmind_scoring_dict = calculate_travelmind_score(user_query, res_for_scoring)
-        true_tm_score = travelmind_scoring_dict.get("travelmind_score", base_score)
+        travelmind_scoring_dict = calculate_travelmind_score(
+            user_query,
+            res_for_scoring,
+            query_requirements=normalized_requirements,
+            requested_location=requested_location,
+        )
+        true_tm_score = travelmind_scoring_dict.get("travelmind_score", 0)
         
         presented_score = true_tm_score
-        rank_score = true_tm_score + (25 * matches) - (35 * missing) - (10 * unknowns)
+        rank_adjustment = (
+            REQUIRED_MATCH_BOOST * matches
+            - REQUIRED_MISSING_PENALTY * missing
+            - REQUIRED_UNKNOWN_PENALTY * unknowns
+            + OPTIONAL_MATCH_BOOST * optional_matches
+        )
+        rank_score = true_tm_score + rank_adjustment
         lat = metadata.get("latitude")
         lon = metadata.get("longitude")
         
@@ -210,8 +355,8 @@ def build_hotel_cards(
             },
             "map_link": map_link,
             "map_link_type": map_link_type,
-            "strengths": build_strengths(res),
-            "cautions": build_cautions(res),
+            "strengths": build_strengths(res_for_scoring),
+            "cautions": build_cautions(res_for_scoring),
             "missing_information": "Review texts might not cover all specific amenities.",
             "metadata": metadata
         }
@@ -219,13 +364,15 @@ def build_hotel_cards(
         card["_matches"] = matches
         card["_unknowns"] = unknowns
         card["_missing"] = missing
+        card["_optional_matches"] = optional_matches
+        card["_rank_adjustment"] = rank_adjustment
 
         hotel_cards.append(card)
         
     hotel_cards = sorted(
         hotel_cards,
-        key=lambda x: (x["_matches"], -x["_unknowns"], -x["_missing"], x["travelmind_score"]),
-        reverse=True
+        key=lambda card: card["rank_score"],
+        reverse=True,
     )
         
     return hotel_cards

@@ -1,94 +1,125 @@
+"""Audit missing hotel metadata without modifying the dataset.
+
+This file used to infer amenities and room types from guest-review prose and
+then overwrite both ``hotel_enriched_raw.json`` and
+``cmu_hotel_metadata.json``.  A review mentioning a pool, for example, is not
+reliable evidence that the hotel currently offers one.  Keeping that behavior
+would therefore corrupt the grounded facts used by the RAG application.
+
+The script is retained only as a backwards-compatible, read-only audit tool.
+It deliberately has no write mode.  Hotel metadata must be repaired from an
+authoritative structured source through the data-enrichment pipeline.
+"""
+
+from __future__ import annotations
+
+import argparse
 import json
-import pandas as pd
-import re
-import os
+from pathlib import Path
+from typing import Any, Mapping, Sequence
 
-base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-raw_json_path = os.path.join(base_dir, 'data', 'raw', 'hotel_enriched_raw.json')
-reviews_csv_path = os.path.join(base_dir, 'data', 'processed', 'cmu_reviews_reliable.csv')
-hotels_csv_path = os.path.join(base_dir, 'data', 'processed', 'cmu_hotels_reliable.csv')
-metadata_json_path = os.path.join(base_dir, 'data', 'cmu_hotel_metadata.json')
 
-print("Loading data...")
-with open(raw_json_path, 'r', encoding='utf-8') as f:
-    enriched_data = json.load(f)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_METADATA_PATH = PROJECT_ROOT / "data" / "raw" / "hotel_enriched_raw.json"
 
-reviews_df = pd.read_csv(reviews_csv_path)
-hotels_df = pd.read_csv(hotels_csv_path)
 
-def extract_with_regex(context):
-    phone = None
-    phone_match = re.search(r'(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}', context)
-    if phone_match:
-        phone = phone_match.group(0)
-        
-    amenities = []
-    amenity_keywords = {
-        "Wi-Fi": ["wi-fi", "wifi", "internet", "wireless"],
-        "Pool": ["pool", "swimming", "indoor pool", "outdoor pool"],
-        "Gym / Fitness": ["gym", "fitness", "workout"],
-        "Breakfast": ["breakfast", "buffet"],
-        "Parking": ["parking", "valet", "garage"],
-        "Restaurant / Bar": ["restaurant", "dining", "bar", "lounge"],
-        "Pet Friendly": ["pet friendly", "pets allowed", "dog", "dogs"]
-    }
-    context_lower = context.lower()
-    for am, kws in amenity_keywords.items():
-        if any(kw in context_lower for kw in kws):
-            amenities.append(am)
-            
-    room_types = []
-    room_keywords = {
-        "Standard Room": ["standard", "basic"],
-        "Deluxe Room": ["deluxe"],
-        "Suite": ["suite", "presidential"],
-        "King Room": ["king"],
-        "Queen Room": ["queen", "double"],
-        "Studio": ["studio"]
-    }
-    for rt, kws in room_keywords.items():
-        if any(kw in context_lower for kw in kws):
-            room_types.append(rt)
-            
+def _has_explicit_values(value: Any) -> bool:
+    """Return whether a structured metadata field contains explicit values."""
+
+    if isinstance(value, Mapping):
+        return any(item not in (None, "", [], {}) for item in value.values())
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return any(item not in (None, "") for item in value)
+    return value not in (None, "")
+
+
+def audit_missing_metadata(metadata_path: Path) -> dict[str, Any]:
+    """Inspect metadata and return missing-field counts without changing files."""
+
+    with metadata_path.open("r", encoding="utf-8") as source:
+        records = json.load(source)
+
+    if not isinstance(records, dict):
+        raise ValueError(f"Expected a JSON object in {metadata_path}")
+
+    missing_amenities: list[str] = []
+    missing_room_types: list[str] = []
+    missing_both: list[str] = []
+
+    for hotel_key, raw_record in records.items():
+        record = raw_record if isinstance(raw_record, dict) else {}
+        has_amenities = _has_explicit_values(record.get("amenities"))
+        has_room_types = _has_explicit_values(record.get("room_types"))
+
+        if not has_amenities:
+            missing_amenities.append(str(hotel_key))
+        if not has_room_types:
+            missing_room_types.append(str(hotel_key))
+        if not has_amenities and not has_room_types:
+            missing_both.append(str(hotel_key))
+
     return {
-        "phone": phone,
-        "amenities": amenities,
-        "room_types": room_types
+        "source": str(metadata_path.resolve()),
+        "hotel_count": len(records),
+        "missing_amenities_count": len(missing_amenities),
+        "missing_room_types_count": len(missing_room_types),
+        "missing_both_count": len(missing_both),
+        "missing_amenities": missing_amenities,
+        "missing_room_types": missing_room_types,
+        "missing_both": missing_both,
     }
 
-missing_count = 0
-fixed_count = 0
 
-for hotel_key, data in enriched_data.items():
-    if not data.get('amenities') and not data.get('room_types'):
-        missing_count += 1
-        hotel_name = data.get('hotel_name')
-        
-        # Find hotel ID
-        hotel_match = hotels_df[hotels_df['hotel_name'] == hotel_name]
-        if not hotel_match.empty:
-            hotel_id = hotel_match.iloc[0]['hotel_id']
-            hotel_reviews = reviews_df[reviews_df['hotel_id'] == hotel_id]
-            
-            # Combine all reviews into a single text block (up to 50000 chars for speed)
-            combined_text = " ".join(hotel_reviews['review_text'].dropna().astype(str).tolist())[:50000]
-            
-            if combined_text:
-                extracted = extract_with_regex(combined_text)
-                if extracted['amenities'] or extracted['room_types']:
-                    data['amenities'] = extracted['amenities']
-                    data['room_types'] = extracted['room_types']
-                    if extracted['phone']:
-                        data['phone'] = extracted['phone']
-                    fixed_count += 1
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Read-only audit for missing explicit hotel amenities and room types. "
+            "This tool never infers facts from reviews and never writes metadata."
+        )
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=DEFAULT_METADATA_PATH,
+        help=f"Metadata JSON to inspect (default: {DEFAULT_METADATA_PATH})",
+    )
+    parser.add_argument(
+        "--sample-size",
+        type=int,
+        default=10,
+        help="Maximum missing hotel keys to show per category (default: 10)",
+    )
+    return parser
 
-print(f"Total missing initially: {missing_count}")
-print(f"Total fixed using reviews: {fixed_count}")
 
-with open(raw_json_path, 'w', encoding='utf-8') as f:
-    json.dump(enriched_data, f, ensure_ascii=False, indent=2)
+def main(argv: Sequence[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+    sample_size = max(args.sample_size, 0)
+    result = audit_missing_metadata(args.input)
 
-with open(metadata_json_path, 'w', encoding='utf-8') as f:
-    json.dump(enriched_data, f, ensure_ascii=False, indent=2)
+    print("Hotel metadata audit (read-only)")
+    print(f"Source: {result['source']}")
+    print(f"Hotels: {result['hotel_count']}")
+    print(f"Missing amenities: {result['missing_amenities_count']}")
+    print(f"Missing room types: {result['missing_room_types_count']}")
+    print(f"Missing both: {result['missing_both_count']}")
 
-print("Saved updated metadata to hotel_enriched_raw.json and cmu_hotel_metadata.json.")
+    if sample_size:
+        for label, key in (
+            ("Amenity sample", "missing_amenities"),
+            ("Room-type sample", "missing_room_types"),
+            ("Missing-both sample", "missing_both"),
+        ):
+            sample = result[key][:sample_size]
+            if sample:
+                print(f"{label}: {', '.join(sample)}")
+
+    print(
+        "No files were changed. Repair missing facts only from an authoritative "
+        "structured source."
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

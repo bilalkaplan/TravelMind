@@ -131,7 +131,7 @@ print("\n[13] Fast Router")
 from cmu_rag_answer import fast_route_query
 check("fast route price", fast_route_query("What is the price?")["intent"] == "price_question")
 check("fast route pool", fast_route_query("Does it have a pool?")["intent"] == "followup_pool")
-check("fast route other hotel", fast_route_query("Show me the other hotel")["intent"] == "followup_other_hotel")
+check("fast route next/other hotel", fast_route_query("Show me the other hotel")["intent"] == "follow_up")
 check("fast route unsupported location", fast_route_query("Paris'te otel öner")["intent"] == "unsupported_location")
 check("fast route fell through", fast_route_query("Otel öner") is None)
 
@@ -153,4 +153,3 @@ else:
 print("=" * 60)
 
 sys.exit(0 if failed == 0 else 1)
-

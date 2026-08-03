@@ -1,4 +1,104 @@
 import re
+import sys
+
+def extract_final_answer(raw_text: str) -> str:
+    """Return the user-facing text from a completed model stream.
+
+    Foundry removes a matched stop sequence, so the normal successful shape
+    is ``<answer>content`` without a closing tag. This mirrors
+    ``cmu_rag_answer.extract_answer`` while keeping the validator import
+    lightweight and independent from the model runtime.
+    """
+    if raw_text is None:
+        return raw_text
+
+    raw_text = str(raw_text).strip()
+    if not raw_text:
+        return raw_text
+
+    opening_match = re.search(r"<answer\s*>", raw_text, re.IGNORECASE)
+    if opening_match:
+        answer_text = raw_text[opening_match.end():]
+        closing_match = re.search(r"</answer\s*>", answer_text, re.IGNORECASE)
+        if closing_match:
+            answer_text = answer_text[:closing_match.start()]
+        return answer_text.strip()
+
+    raw_text = re.sub(
+        r"\s*</answer\s*>\s*$", "", raw_text, flags=re.IGNORECASE
+    )
+    meta_preamble = re.compile(
+        r"^\s*(?:[-*>#`]+\s*)?(?:analysis\s*:\s*)?"
+        r"(?:okay\b|let me\b|i must\b|the user\b|i know (?:the )?rules\b|"
+        r"i need to\b|i should\b)",
+        re.IGNORECASE,
+    )
+
+    paragraphs = [
+        paragraph.strip()
+        for paragraph in re.split(r"\r?\n\s*\r?\n", raw_text)
+        if paragraph.strip()
+    ]
+    first_public_paragraph = 0
+    while (
+        first_public_paragraph < len(paragraphs)
+        and meta_preamble.match(paragraphs[first_public_paragraph])
+    ):
+        first_public_paragraph += 1
+    if 0 < first_public_paragraph < len(paragraphs):
+        return "\n\n".join(paragraphs[first_public_paragraph:]).strip()
+
+    lines = raw_text.splitlines()
+    first_nonempty = next(
+        (index for index, line in enumerate(lines) if line.strip()), None
+    )
+    if first_nonempty is not None and meta_preamble.match(lines[first_nonempty]):
+        remainder = "\n".join(lines[first_nonempty + 1:]).strip()
+        if remainder:
+            return remainder
+
+    return raw_text
+
+
+def _flatten_evidence_text(evidence_text) -> str:
+    """Accept plain text as well as the review-result lists used by the UI."""
+    if evidence_text is None:
+        return ""
+    if isinstance(evidence_text, str):
+        return evidence_text
+    if isinstance(evidence_text, dict):
+        if "text" in evidence_text:
+            return str(evidence_text.get("text") or "")
+        return "\n".join(_flatten_evidence_text(value) for value in evidence_text.values())
+    if isinstance(evidence_text, (list, tuple, set)):
+        return "\n".join(_flatten_evidence_text(item) for item in evidence_text)
+    return str(evidence_text)
+
+
+def _normalize_claim_text(text: str) -> str:
+    text = str(text or "").casefold()
+    text = text.replace("’", "'").replace("‘", "'")
+    text = re.sub(r"[^\w]+", " ", text, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _claim_is_in_evidence(claim: str, evidence_text: str) -> bool:
+    """Literal, punctuation-insensitive support check for a flagged claim."""
+    normalized_claim = _normalize_claim_text(claim)
+    normalized_evidence = _normalize_claim_text(evidence_text)
+    return bool(
+        normalized_claim
+        and normalized_evidence
+        and normalized_claim in normalized_evidence
+    )
+
+
+def _split_sentences(answer: str) -> list:
+    return [
+        sentence.strip()
+        for sentence in re.split(r"(?<=[.!?])(?:\s+|$)|\n+", str(answer or ""))
+        if sentence.strip()
+    ]
 
 def detect_internal_analysis(answer: str) -> bool:
     forbidden = [
@@ -9,6 +109,9 @@ def detect_internal_analysis(answer: str) -> bool:
         "<think>", "</think>",
         "okay, the user asked", "let me start", "i should mention",
         "i should also", "the user is asking", "i should make sure",
+        "i must check", "i must answer", "i must follow",
+        "i know the rules", "the user's question", "the user's request",
+        "the answer must", "my answer must", "final answer must",
         "chain-of-thought", "hidden reasoning",
         "kullanıcı soruyor", "kullanıcının isteği", "bir değerlendireyim",
         "bir bakayım", "kısaca özetlemek gerekirse",
@@ -38,12 +141,21 @@ def detect_score_overflow(answer: str) -> bool:
             pass
     return False
 
-def detect_price_claims(answer: str) -> bool:
+
+def find_score_overflow_claims(answer: str) -> list:
+    return [
+        sentence
+        for sentence in _split_sentences(answer)
+        if detect_score_overflow(sentence)
+    ]
+
+def find_price_or_booking_claims(answer: str) -> list:
     price_keywords = [
         r"\$", "dollar", "euro", "£", "€", "₺", "tl",
         "per night", "nightly rate", "gecelik", "fiyatı",
         "rezervasyon yapabilirsiniz", "book now", "booking.com", "expedia",
-        "reserve now", "available tonight", "müsait oda var"
+        "reserve now", "available tonight", "available for booking",
+        "rooms are available now", "müsait oda var"
     ]
     refusal_keywords = [
         "cannot provide live prices", "fiyat verisi güvenilir değil",
@@ -53,8 +165,8 @@ def detect_price_claims(answer: str) -> bool:
         "cannot confirm availability", "cannot confirm single-room availability"
     ]
     
-    sentences = re.split(r'(?<=[.!?]) +', answer)
-    for sentence in sentences:
+    claims = []
+    for sentence in _split_sentences(answer):
         lower_sent = sentence.lower()
         has_price_kw = False
         for kw in price_keywords:
@@ -70,9 +182,23 @@ def detect_price_claims(answer: str) -> bool:
         is_refusal = any(kw in lower_sent for kw in refusal_keywords)
         
         if has_price_kw and not is_refusal:
-            if has_number or "book now" in lower_sent or "rezervasyon" in lower_sent or "reserve now" in lower_sent or "booking.com" in lower_sent or "available tonight" in lower_sent:
-                return True
-    return False
+            if (
+                has_number
+                or "book now" in lower_sent
+                or "rezervasyon" in lower_sent
+                or "reserve now" in lower_sent
+                or "booking.com" in lower_sent
+                or "available tonight" in lower_sent
+                or "available for booking" in lower_sent
+                or "rooms are available now" in lower_sent
+                or "müsait oda var" in lower_sent
+            ):
+                claims.append(sentence)
+    return claims
+
+
+def detect_price_claims(answer: str) -> bool:
+    return bool(find_price_or_booking_claims(answer))
 
 def is_negative_context(sentence: str) -> bool:
     negatives = [
@@ -82,7 +208,7 @@ def is_negative_context(sentence: str) -> bool:
     sent_lower = sentence.lower()
     return any(re.search(neg, sent_lower) for neg in negatives)
 
-def detect_room_guarantee(answer: str, hotel_cards: list) -> bool:
+def find_room_guarantees(answer: str, hotel_cards: list) -> list:
     live_availability_phrases = [
         "rooms are available now", "available for booking", 
         "available tonight", "müsait oda var", "rezervasyon yapabilirsiniz"
@@ -101,8 +227,8 @@ def detect_room_guarantee(answer: str, hotel_cards: list) -> bool:
         "is confirmed in the current amenity data",
         "görünmektedir", "doğrulanıyor", "görünmüyor"
     ]
-    sentences = re.split(r'(?<=[.!?]) +', answer)
-    for sentence in sentences:
+    claims = []
+    for sentence in _split_sentences(answer):
         sent_lower = sentence.lower()
         if any(safe in sent_lower for safe in safe_phrases):
             continue
@@ -110,31 +236,29 @@ def detect_room_guarantee(answer: str, hotel_cards: list) -> bool:
             continue
             
         if any(phrase in sent_lower for phrase in live_availability_phrases):
-            return True
+            claims.append(sentence)
+            continue
             
-        for phrase in single_room_phrases:
-            if phrase in sent_lower:
-                supported = False
-                for card in hotel_cards:
-                    r_info = card.get("room_info", {})
-                    if r_info.get("single_room") == "YES":
-                        supported = True
-                        break
-                    if any("single" in str(bt).lower() for bt in r_info.get("booking_room_types", [])):
-                        supported = True
-                        break
-                if not supported:
-                    return True
-    return False
+        # A known room *type* is not proof of live bookability. Treat an
+        # affirmative "is available" statement as a booking claim even when
+        # the static card lists single rooms.
+        if any(phrase in sent_lower for phrase in single_room_phrases):
+            claims.append(sentence)
+    return claims
 
-def detect_amenity_false_claim(answer: str, hotel_cards: list) -> bool:
+
+def detect_room_guarantee(answer: str, hotel_cards: list) -> bool:
+    return bool(find_room_guarantees(answer, hotel_cards))
+
+
+def find_amenity_false_claims(answer: str, hotel_cards: list) -> list:
     breakfast_claims = [
         "has breakfast", "breakfast included", "breakfast is available",
         "breakfast service", "kahvaltısı var", "kahvaltı sunuyor",
         "kahvaltı hizmeti"
     ]
-    sentences = re.split(r'(?<=[.!?]) +', answer)
-    for sentence in sentences:
+    claims = []
+    for sentence in _split_sentences(answer):
         sent_lower = sentence.lower()
         if is_negative_context(sent_lower):
             continue
@@ -145,8 +269,13 @@ def detect_amenity_false_claim(answer: str, hotel_cards: list) -> bool:
                     for card in hotel_cards
                 )
                 if not any_breakfast:
-                    return True
-    return False
+                    claims.append(sentence)
+                    break
+    return claims
+
+
+def detect_amenity_false_claim(answer: str, hotel_cards: list) -> bool:
+    return bool(find_amenity_false_claims(answer, hotel_cards))
 
 def detect_map_link_hallucination(answer: str, hotel_cards: list) -> bool:
     if "google.com/maps" in answer.lower():
@@ -157,6 +286,44 @@ def detect_map_link_hallucination(answer: str, hotel_cards: list) -> bool:
         if not any_map:
             return True
     return False
+
+
+_LINK_PATTERN = re.compile(
+    r"(?:https?://|www\.)[^\s<>()\[\]{}]+"
+    r"|\b(?:[a-z0-9-]+\.)+(?:com|org|net|io|co|travel|hotel)"
+    r"/[^\s<>()\[\]{}]+",
+    re.IGNORECASE,
+)
+
+
+def _canonical_link(link: str) -> str:
+    link = str(link or "").strip().rstrip(".,;:!?\"'")
+    link = re.sub(r"^https?://", "", link, flags=re.IGNORECASE)
+    link = re.sub(r"^www\.", "", link, flags=re.IGNORECASE)
+    return link.casefold().rstrip("/")
+
+
+def find_fabricated_links(answer: str, hotel_cards: list, evidence_text: str = "") -> list:
+    allowed_links = set()
+    for card in hotel_cards or []:
+        for key in ("map_link", "link", "url"):
+            value = card.get(key)
+            if value and str(value).upper() != "UNKNOWN":
+                allowed_links.add(_canonical_link(value))
+
+    evidence_lower = str(evidence_text or "").casefold()
+    fabricated = []
+    for match in _LINK_PATTERN.finditer(str(answer or "")):
+        raw_link = match.group(0).rstrip(".,;:!?\"'")
+        canonical = _canonical_link(raw_link)
+        if not canonical:
+            continue
+        if canonical in allowed_links:
+            continue
+        if raw_link.casefold() in evidence_lower or canonical in evidence_lower:
+            continue
+        fabricated.append(raw_link)
+    return fabricated
 
 def build_safe_fallback_answer(target_language: str, intent: str, hotel_cards: list = None) -> str:
     # Just a wrapper if intent is hotel_search
@@ -170,7 +337,7 @@ def build_safe_fallback_answer(target_language: str, intent: str, hotel_cards: l
         else:
             return "TravelMind does not provide live pricing or availability because our system does not contain real-time booking data."
             
-    if intent in ("follow_up", "specific_hotel_info"):
+    if intent in ("follow_up", "specific_hotel_info", "review_question"):
         if target_language.lower() in ["turkish", "tr"]:
             return "İstediğiniz detayı doğrudan veri setimizde net olarak doğrulayamadım. Size başka nasıl yardımcı olabilirim?"
         else:
@@ -182,66 +349,165 @@ def build_safe_fallback_answer(target_language: str, intent: str, hotel_cards: l
     else:
         return "TravelMind does not provide live pricing or availability, only hotel recommendations based on historical reviews. Please try your search again using just a location."
 
-def validate_answer(answer: str, hotel_cards: list, intent: str, requested_location: str, target_language: str) -> dict:
-    issues = []
+def validate_answer(
+    answer: str,
+    hotel_cards: list,
+    intent: str,
+    requested_location: str,
+    target_language: str,
+    evidence_text=None,
+    allowed_hotel_names=None,
+) -> dict:
+    """Validate an answer without discarding useful, evidence-based prose.
+
+    ``passed`` remains a strict signal (no issues at all) for backward
+    compatibility. ``needs_fallback`` is deliberately narrower: the answer is
+    replaced only for leaked reasoning, unsupported price/booking claims, or
+    fabricated links. All other findings are warnings and leave the original
+    answer untouched.
+    """
+    answer = str(answer or "")
     hotel_cards = hotel_cards or []
-    
+    evidence = _flatten_evidence_text(evidence_text)
+    issues = []
+
+    def add_issue(issue_type, detail, blocks_output=False):
+        issues.append(
+            {
+                "type": issue_type,
+                "detail": detail,
+                "blocks_output": bool(blocks_output),
+            }
+        )
+
     if detect_internal_analysis(answer):
-        issues.append({"type": "internal_analysis_leak", "detail": "Model leaked internal thoughts."})
-        
+        add_issue(
+            "internal_analysis_leak",
+            "Model leaked internal thoughts.",
+            blocks_output=True,
+        )
+
     if detect_placeholders(answer):
-        issues.append({"type": "placeholder_leak", "detail": "Model copied template placeholders."})
-        
-    if detect_score_overflow(answer):
-        issues.append({"type": "score_overflow", "detail": "Model hallucinated a score > 100."})
-        
-    if detect_price_claims(answer):
-        issues.append({"type": "price_booking_leak", "detail": "Model tried to show price or booking links."})
-    
-    # Hotel name check
-    allowed_hotels = [card.get("hotel_name") for card in hotel_cards if card.get("hotel_name") != "UNKNOWN"]
-    potential_hotels = re.findall(r'([A-Z][a-zA-Z\s]+(?:Hotel|Resort|Inn|Suites|Motel))', answer)
-    allowed_lower = [name.lower() for name in allowed_hotels]
-    
-    generic_terms = [
-        "this hotel", "the hotel", "boutique hotel", "luxury hotel", "great hotel", 
-        "excellent hotel", "beautiful hotel", "nice hotel", "good hotel", "best hotel", 
-        "grand hotel", "spa resort", "family resort", "business hotel", "harika hotel", 
-        "mükemmel hotel", "güzel hotel", "iyi hotel", "a hotel", "an hotel"
+        add_issue("placeholder_leak", "Model copied template placeholders.")
+
+    unsupported_score_claims = [
+        claim
+        for claim in find_score_overflow_claims(answer)
+        if not _claim_is_in_evidence(claim, evidence)
     ]
-    
-    for ph in potential_hotels:
-        ph_clean = ph.strip().lower()
-        # Ignore if it's just a generic descriptive term ending with "hotel"
-        if any(ph_clean.endswith(g) for g in generic_terms) or ph_clean in generic_terms:
+    if unsupported_score_claims:
+        add_issue("score_overflow", "Model hallucinated a score > 100.")
+
+    unsupported_price_claims = [
+        claim
+        for claim in find_price_or_booking_claims(answer)
+        if not _claim_is_in_evidence(claim, evidence)
+    ]
+    if unsupported_price_claims:
+        add_issue(
+            "price_booking_leak",
+            f"Unsupported price/booking claim: {unsupported_price_claims[0]}",
+            blocks_output=True,
+        )
+
+    allowed_hotels = [
+        str(card.get("hotel_name"))
+        for card in hotel_cards
+        if card.get("hotel_name") not in (None, "", "UNKNOWN")
+    ]
+    if isinstance(allowed_hotel_names, str):
+        allowed_hotels.append(allowed_hotel_names)
+    elif allowed_hotel_names:
+        allowed_hotels.extend(
+            str(name)
+            for name in allowed_hotel_names
+            if name not in (None, "", "UNKNOWN")
+        )
+
+    potential_hotels = re.findall(
+        r"([A-Z][a-zA-Z\s]+(?:Hotel|Resort|Inn|Suites|Motel))", answer
+    )
+    allowed_lower = [name.casefold().strip() for name in allowed_hotels]
+
+    generic_terms = [
+        "this hotel", "the hotel", "boutique hotel", "luxury hotel", "great hotel",
+        "excellent hotel", "beautiful hotel", "nice hotel", "good hotel", "best hotel",
+        "grand hotel", "spa resort", "family resort", "business hotel", "harika hotel",
+        "mükemmel hotel", "güzel hotel", "iyi hotel", "a hotel", "an hotel",
+    ]
+
+    for potential_hotel in potential_hotels:
+        hotel_name = potential_hotel.strip()
+        hotel_name_lower = hotel_name.casefold()
+        if (
+            any(hotel_name_lower.endswith(generic) for generic in generic_terms)
+            or hotel_name_lower in generic_terms
+        ):
             continue
-            
-        if ph_clean not in allowed_lower:
-            if not any(ph_clean in al for al in allowed_lower) and not any(al in ph_clean for al in allowed_lower):
-                issues.append({"type": "unknown_hotel_name", "detail": f"Mentioned unknown hotel: {ph.strip()}"})
 
-    # Room guarantee check
-    if detect_room_guarantee(answer, hotel_cards):
-        issues.append({"type": "single_room_hallucination", "detail": "Claimed single room availability but data is UNKNOWN."})
-    
-    # Amenity false claim check
-    if detect_amenity_false_claim(answer, hotel_cards):
-        issues.append({"type": "breakfast_hallucination", "detail": "Claimed breakfast but no hotel has it confirmed."})
-    
-    # Map link hallucination
-    if detect_map_link_hallucination(answer, hotel_cards):
-        issues.append({"type": "map_link_hallucination", "detail": "Generated map link when all map link types are UNKNOWN."})
+        is_allowed = any(
+            hotel_name_lower == allowed
+            or hotel_name_lower in allowed
+            or allowed in hotel_name_lower
+            for allowed in allowed_lower
+        )
+        if not is_allowed and not _claim_is_in_evidence(hotel_name, evidence):
+            add_issue(
+                "unknown_hotel_name",
+                f"Mentioned unknown hotel: {hotel_name}",
+            )
 
-    passed = len(issues) == 0
-    
-    # Generate fallback if needed
+    unsupported_room_claims = [
+        claim
+        for claim in find_room_guarantees(answer, hotel_cards)
+        if not _claim_is_in_evidence(claim, evidence)
+    ]
+    if unsupported_room_claims:
+        # Live room availability is a booking claim, so it is one of the
+        # three explicitly blocking categories even though the legacy issue
+        # name is retained for callers that inspect it.
+        add_issue(
+            "single_room_hallucination",
+            f"Unsupported room availability claim: {unsupported_room_claims[0]}",
+            blocks_output=True,
+        )
+
+    unsupported_amenity_claims = [
+        claim
+        for claim in find_amenity_false_claims(answer, hotel_cards)
+        if not _claim_is_in_evidence(claim, evidence)
+    ]
+    if unsupported_amenity_claims:
+        add_issue(
+            "breakfast_hallucination",
+            f"Unverified breakfast claim: {unsupported_amenity_claims[0]}",
+        )
+
+    fabricated_links = find_fabricated_links(answer, hotel_cards, evidence)
+    if fabricated_links:
+        add_issue(
+            "map_link_hallucination",
+            f"Generated unsupported link: {fabricated_links[0]}",
+            blocks_output=True,
+        )
+
+    blocking_issues = [issue for issue in issues if issue["blocks_output"]]
+    warning_issues = [issue for issue in issues if not issue["blocks_output"]]
+    for issue in warning_issues:
+        print(
+            f"[answer_validator] warning {issue['type']}: {issue['detail']}",
+            file=sys.stderr,
+        )
+
     sanitized = answer
-    if not passed:
+    if blocking_issues:
         sanitized = build_safe_fallback_answer(target_language, intent, hotel_cards)
-        
+
     return {
-        "passed": passed,
+        "passed": len(issues) == 0,
         "issues": [issue["type"] for issue in issues],
+        "blocking_issues": [issue["type"] for issue in blocking_issues],
+        "warnings": [issue["type"] for issue in warning_issues],
         "sanitized_answer": sanitized,
-        "needs_fallback": not passed
+        "needs_fallback": bool(blocking_issues),
     }
