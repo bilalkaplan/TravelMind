@@ -153,7 +153,7 @@ def verbalize_room_info(room_type, status, language="en"):
 
 
 
-def build_hotel_context(query, card, index):
+def build_hotel_context(query, card, index, lang_code="tr"):
     hotel_name = card.get("hotel_name", "")
     location = card.get("location", "")
     hotel_class = card.get("hotel_class", "")
@@ -175,12 +175,15 @@ def build_hotel_context(query, card, index):
     room_types_meta = room_info_dict.get("room_types", [])
     
     room_info_list = []
+    
+    is_tr = str(lang_code).lower().startswith("tr")
+    
     if has_single_room:
-        room_info_list.append("single rooms")
+        room_info_list.append("Tek Kişilik Oda" if is_tr else "single rooms")
     if has_double_room:
-        room_info_list.append("double rooms")
+        room_info_list.append("Çift Kişilik Oda" if is_tr else "double rooms")
     if has_suite:
-        room_info_list.append("suites (suit oda)")
+        room_info_list.append("Süit Oda" if is_tr else "suites")
         
     if room_types_meta:
         for rt in room_types_meta:
@@ -192,19 +195,39 @@ def build_hotel_context(query, card, index):
             if br.lower() not in " ".join(room_info_list).lower():
                 room_info_list.append(str(br))
         
-    room_info = "Unknown / Not explicitly guaranteed in this dataset chunk."
+    room_info = "Belirtilmemiş" if is_tr else "Unknown / Not explicitly guaranteed in this dataset chunk."
     if room_info_list:
-        room_info = "Available Rooms: " + ", ".join(room_info_list)
+        room_info = ("Mevcut Odalar: " if is_tr else "Available Rooms: ") + ", ".join(room_info_list)
         
     amenities = card.get("amenities", {})
     confirmed_amenities = []
+    
+    am_tr_map = {
+        "wifi": "Ücretsiz Wi-Fi",
+        "breakfast": "Kahvaltı",
+        "pool": "Havuz",
+        "wheelchair_accessible": "Tekerlekli Sandalye Uygunluğu",
+        "pet_friendly": "Evcil Hayvan Dostu",
+        "parking": "Otopark",
+        "restaurant": "Restoran",
+        "bar": "Bar",
+        "fitness_center": "Spor Salonu"
+    }
+    
     for k, v in amenities.items():
         if v == "YES":
-            confirmed_amenities.append(k)
+            mapped_k = am_tr_map.get(k, k.replace("_", " ").title()) if is_tr else k
+            confirmed_amenities.append(mapped_k)
         elif k == "other" and isinstance(v, list):
-            confirmed_amenities.extend(v)
+            for item in v:
+                mapped_item = item.replace("_", " ").title()
+                if is_tr:
+                    # Very basic map for some other items
+                    tr_other_map = {"gym": "Spor Salonu", "spa": "Spa Merkezi"}
+                    mapped_item = tr_other_map.get(item.lower(), mapped_item)
+                confirmed_amenities.append(mapped_item)
             
-    amenities_str = "None specifically confirmed"
+    amenities_str = "Özel olarak onaylanmış olanak yok" if is_tr else "None specifically confirmed"
     if confirmed_amenities:
         amenities_str = ", ".join(confirmed_amenities)
 
@@ -237,72 +260,16 @@ Hotel Card {index}:
 
 
 def stream_extract_answer(response, lang_code):
-    inside_answer = False
-    has_seen_answer_tag = False
-    buffer = ""
-    raw_full_buffer = ""
-    
     for chunk in response:
         delta = chunk.choices[0].delta.content or ""
-        if not delta:
-            continue
-            
-        buffer += delta
-        raw_full_buffer += delta
-        
-        if not inside_answer:
-            if "<answer>" in buffer:
-                inside_answer = True
-                has_seen_answer_tag = True
-                parts = buffer.split("<answer>")
-                buffer = parts[1]
-                
-                if "</answer>" in buffer:
-                    inside_answer = False
-                    sub_parts = buffer.split("</answer>")
-                    if sub_parts[0]:
-                        yield {"type": "answer", "content": sub_parts[0]}
-                    buffer = sub_parts[1]
-                else:
-                    idx = buffer.rfind("<")
-                    if idx != -1:
-                        yield {"type": "answer", "content": buffer[:idx]}
-                        buffer = buffer[idx:]
-                    else:
-                        yield {"type": "answer", "content": buffer}
-                        buffer = ""
-            else:
-                # Keep the last 10 characters in case <answer> is split across chunks
-                buffer = buffer[-10:]
-        else:
-            if "</answer>" in buffer:
-                inside_answer = False
-                parts = buffer.split("</answer>")
-                if parts[0]:
-                    yield {"type": "answer", "content": parts[0]}
-                buffer = parts[1]
-            else:
-                idx = buffer.rfind("<")
-                if idx != -1:
-                    yield {"type": "answer", "content": buffer[:idx]}
-                    buffer = buffer[idx:]
-                else:
-                    yield {"type": "answer", "content": buffer}
-                    buffer = ""
-
-    if not has_seen_answer_tag and raw_full_buffer.strip():
-        # Fallback: if the model completely failed to output <answer>,
-        # try to split by \n\n and take the last part (usually the final answer after CoT)
-        parts = raw_full_buffer.split("\n\n")
-        final_guess = parts[-1] if len(parts) > 1 else raw_full_buffer
-        if final_guess.strip():
-            yield {"type": "answer", "content": final_guess.strip()}
+        if delta:
+            yield {"type": "answer", "content": delta}
 
 def generate_llm_answer(query, hotel_context_str, chat_history, location, lang_code="tr", hotel_cards=None):
     try:
                         
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=300.0)
         model_id = get_available_model_id(client)
             
         meta = load_hotel_metadata()
@@ -327,7 +294,8 @@ def generate_llm_answer(query, hotel_context_str, chat_history, location, lang_c
         response = client.chat.completions.create(
             model=model_id,
             messages=typing.cast(typing.Any, [{'role': 'system', 'content': prompt}] + get_truncated_history(chat_history) + [{'role': 'user', 'content': query}]),
-            temperature=0.0,
+            temperature=0.3,
+            frequency_penalty=0.5,
             max_tokens=4000,
             stream=True
         )
@@ -344,7 +312,7 @@ def generate_llm_answer(query, hotel_context_str, chat_history, location, lang_c
 def generate_conversational_answer(query, lang_code, chat_history):
     try:
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=300.0)
         model_id = get_available_model_id(client)
 
         lang_map = {"en": "English", "tr": "Turkish", "de": "German", "fr": "French", "it": "Italian", "zh": "Chinese"}
@@ -376,14 +344,14 @@ def generate_followup_answer(query, context_str, lang_code, chat_history):
         from hotel_card_builder import build_hotel_cards
         
         base_url = get_foundry_base_url()
-        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=60.0)
+        client = OpenAI(base_url=base_url, api_key='not-needed', timeout=300.0)
         model_id = get_available_model_id(client)
 
         lang_map = {"en": "English", "tr": "Turkish"}
         target_lang = lang_map.get(lang_code, "Turkish")
         
         import prompt_builders
-        style_instruction = prompt_builders.get_style_instruction(target_lang)
+        style_instruction = prompt_builders.get_style_instruction(target_lang, is_followup=True)
         prompt = prompt_builders.build_followup_prompt(
             target_language=target_lang,
             hotel_context_str=context_str if isinstance(context_str, str) else "",
@@ -393,7 +361,8 @@ def generate_followup_answer(query, context_str, lang_code, chat_history):
         response = client.chat.completions.create(
             model=model_id,
             messages=typing.cast(typing.Any, [{'role': 'system', 'content': prompt}] + get_truncated_history(chat_history) + [{'role': 'user', 'content': query}]),
-            temperature=0.0,
+            temperature=0.3,
+            frequency_penalty=0.5,
             max_tokens=4000,
             stream=True
         )
@@ -526,7 +495,7 @@ def get_llm_intent_and_location(query: str, chat_history: list) -> dict:
     try:
         base_url = get_foundry_base_url()
         import typing, json
-        client = OpenAI(base_url=base_url, api_key="not-needed")
+        client = OpenAI(base_url=base_url, api_key="not-needed", timeout=300.0)
         model_id = get_available_model_id(client)
 
         import prompt_builders
@@ -534,7 +503,8 @@ def get_llm_intent_and_location(query: str, chat_history: list) -> dict:
         response = client.chat.completions.create(
             model=model_id,
             messages=typing.cast(typing.Any, [{"role": "system", "content": system_prompt}] + get_truncated_history(chat_history) + [{"role": "user", "content": query}]),
-            temperature=0.0,
+            temperature=0.3,
+            frequency_penalty=0.5,
             stream=True
         )
         content = ""

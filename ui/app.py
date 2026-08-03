@@ -388,22 +388,31 @@ for msg in st.session_state.messages:
                 if isinstance(amenities_dict, list):
                     amenities_dict = {} 
                 
+                nice_am_lower = set()
                 nice_am = []
                 for k, v in amenities_dict.items():
                     if k == 'other':
                         if isinstance(v, list):
                             for o_am in v[:4]:
-                                nice_am.append(str(o_am).title())
+                                o_am_str = str(o_am).title()
+                                if o_am_str.lower() not in nice_am_lower:
+                                    nice_am.append(o_am_str)
+                                    nice_am_lower.add(o_am_str.lower())
                         continue
                     if v == 'YES':
-                        if k == 'wifi': nice_am.append("Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)")
-                        elif k == 'pool': nice_am.append("Pool" if t['code'] != 'tr' else "Havuz")
-                        elif k == 'gym' or k == 'gym_fitness': nice_am.append("Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu")
-                        elif k == 'breakfast': nice_am.append("Breakfast" if t['code'] != 'tr' else "Kahvaltı")
-                        elif k == 'parking': nice_am.append("Parking" if t['code'] != 'tr' else "Otopark")
-                        elif k == 'wheelchair_accessible': nice_am.append("Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi")
-                        elif k == 'pet_friendly': nice_am.append("Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu")
-                        else: nice_am.append(k.replace('_', ' ').capitalize())
+                        am_val = None
+                        if k == 'wifi': am_val = "Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)"
+                        elif k == 'pool': am_val = "Pool" if t['code'] != 'tr' else "Havuz"
+                        elif k == 'gym' or k == 'gym_fitness': am_val = "Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu"
+                        elif k == 'breakfast': am_val = "Breakfast" if t['code'] != 'tr' else "Kahvaltı"
+                        elif k == 'parking': am_val = "Parking" if t['code'] != 'tr' else "Otopark"
+                        elif k == 'wheelchair_accessible': am_val = "Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi"
+                        elif k == 'pet_friendly': am_val = "Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu"
+                        else: am_val = k.replace('_', ' ').capitalize()
+                        
+                        if am_val and am_val.lower() not in nice_am_lower:
+                            nice_am.append(am_val)
+                            nice_am_lower.add(am_val.lower())
                 
                 room_info_dict = card.get('room_info', {})
                 room_types_list = room_info_dict.get('room_types', room_info_dict.get('booking_room_types', []))
@@ -445,9 +454,11 @@ for msg in st.session_state.messages:
                             
                         req_warnings = card.get("requirement_satisfaction", {})
                         if req_warnings:
+                            req_tr = {"single_room": "Tek Kişilik Oda", "double_room": "Çift Kişilik Oda", "suite": "Suit Oda", "pool": "Havuz", "wifi": "Wi-Fi", "breakfast": "Kahvaltı", "parking": "Otopark", "wheelchair_accessible": "Engelli Erişimi", "pet_friendly": "Evcil Hayvan Dostu"}
                             for req_key, req_status in req_warnings.items():
                                 if req_status == "UNKNOWN" or req_status == "MISSING":
-                                    warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
+                                    translated_key = req_tr.get(req_key, req_key.replace('_', ' ').capitalize()) if t['code'] == 'tr' else req_key.replace('_', ' ').capitalize()
+                                    warn_msg = f"{translated_key}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{translated_key}: Mevcut veri setinde doğrulanamadı."
                                     st.write(f"⚠️ **{warn_msg}**")
                                     
                     with c2:
@@ -575,11 +586,21 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                 if True:
                     generator = generate_conversational_answer(prompt, t["code"], st.session_state.messages[:-1])
                     full_answer = ""
+                    think_buffer = ""
                     for chunk in generator:
-                        if isinstance(chunk, dict) and chunk["type"] == "answer":
-                            full_answer += chunk["content"]
+                        if isinstance(chunk, dict):
+                            if chunk["type"] == "answer":
+                                full_answer += chunk["content"]
+                                think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                                answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
+                            elif chunk["type"] == "think":
+                                think_buffer += chunk["content"]
+                                think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>"
+                                answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                         elif not isinstance(chunk, dict):
                             full_answer += chunk
+                            think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                            answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                             
                     full_answer = sanitize_before_render(full_answer)
                     if full_answer is None:
@@ -688,7 +709,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                             
                     context_str = ""
                     for i, card in enumerate(cards_to_include, start=1):
-                        context_str += build_hotel_context(prompt, card, i) + "\n\n"
+                        context_str += build_hotel_context(prompt, card, i, lang_code=st.session_state.language) + "\n\n"
                         
                     generator = generate_followup_answer(
                         query=prompt, 
@@ -697,11 +718,21 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                         chat_history=st.session_state.messages[:-1]
                     )
                     full_answer = ""
+                    think_buffer = ""
                     for chunk in generator:
-                        if isinstance(chunk, dict) and chunk["type"] == "answer":
-                            full_answer += chunk["content"]
+                        if isinstance(chunk, dict):
+                            if chunk["type"] == "answer":
+                                full_answer += chunk["content"]
+                                think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                                answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
+                            elif chunk["type"] == "think":
+                                think_buffer += chunk["content"]
+                                think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>"
+                                answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                         elif not isinstance(chunk, dict):
                             full_answer += chunk
+                            think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                            answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                                 
                     from answer_validator import validate_answer
                     validation = validate_answer(full_answer, last_cards, "follow_up", None, t["code"])
@@ -745,7 +776,7 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                         from cmu_rag_answer import build_hotel_context
                         hotel_context_str = ""
                         for i, result in enumerate(sorted_cards, start=1):
-                            hotel_context_str += build_hotel_context(prompt, result, i) + "\n\n"
+                            hotel_context_str += build_hotel_context(prompt, result, i, lang_code=st.session_state.language) + "\n\n"
                             
                         generator = generate_llm_answer(
                             query=prompt, 
@@ -756,11 +787,21 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                             hotel_cards=sorted_cards
                         )
                         full_answer = ""
+                        think_buffer = ""
                         for chunk in generator:
-                            if isinstance(chunk, dict) and chunk["type"] == "answer":
-                                full_answer += chunk["content"]
+                            if isinstance(chunk, dict):
+                                if chunk["type"] == "answer":
+                                    full_answer += chunk["content"]
+                                    think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                                    answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
+                                elif chunk["type"] == "think":
+                                    think_buffer += chunk["content"]
+                                    think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>"
+                                    answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                             elif not isinstance(chunk, dict):
                                 full_answer += chunk
+                                think_display = f"<div style='color: gray; font-size: 0.85em;'><i>🤔 Düşünüyor...<br>{think_buffer}</i></div><br>" if think_buffer else ""
+                                answer_container.markdown(think_display + full_answer + " ▌", unsafe_allow_html=True)
                                 
                         validation = validate_answer(full_answer, sorted_cards, "hotel_search", effective_location, t["code"])
                         final_display = validation["sanitized_answer"]
@@ -804,22 +845,31 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                         if isinstance(amenities_dict, list):
                             amenities_dict = {} 
                         
+                        nice_am_lower = set()
                         nice_am = []
                         for k, v in amenities_dict.items():
                             if k == 'other':
                                 if isinstance(v, list):
                                     for o_am in v[:4]:
-                                        nice_am.append(str(o_am).title())
+                                        o_am_str = str(o_am).title()
+                                        if o_am_str.lower() not in nice_am_lower:
+                                            nice_am.append(o_am_str)
+                                            nice_am_lower.add(o_am_str.lower())
                                 continue
                             if v == 'YES':
-                                if k == 'wifi': nice_am.append("Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)")
-                                elif k == 'pool': nice_am.append("Pool" if t['code'] != 'tr' else "Havuz")
-                                elif k == 'gym' or k == 'gym_fitness': nice_am.append("Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu")
-                                elif k == 'breakfast': nice_am.append("Breakfast" if t['code'] != 'tr' else "Kahvaltı")
-                                elif k == 'parking': nice_am.append("Parking" if t['code'] != 'tr' else "Otopark")
-                                elif k == 'wheelchair_accessible': nice_am.append("Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi")
-                                elif k == 'pet_friendly': nice_am.append("Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu")
-                                else: nice_am.append(k.replace('_', ' ').capitalize())
+                                am_val = None
+                                if k == 'wifi': am_val = "Wi-Fi" if t['code'] != 'tr' else "Wi-Fi (İnternet)"
+                                elif k == 'pool': am_val = "Pool" if t['code'] != 'tr' else "Havuz"
+                                elif k == 'gym' or k == 'gym_fitness': am_val = "Gym / Fitness" if t['code'] != 'tr' else "Spor Salonu"
+                                elif k == 'breakfast': am_val = "Breakfast" if t['code'] != 'tr' else "Kahvaltı"
+                                elif k == 'parking': am_val = "Parking" if t['code'] != 'tr' else "Otopark"
+                                elif k == 'wheelchair_accessible': am_val = "Wheelchair Accessible" if t['code'] != 'tr' else "Engelli Erişimi"
+                                elif k == 'pet_friendly': am_val = "Pet Friendly" if t['code'] != 'tr' else "Evcil Hayvan Dostu"
+                                else: am_val = k.replace('_', ' ').capitalize()
+                                
+                                if am_val and am_val.lower() not in nice_am_lower:
+                                    nice_am.append(am_val)
+                                    nice_am_lower.add(am_val.lower())
                         
                         room_info_dict = card.get('room_info', {})
                         room_types_list = room_info_dict.get('room_types', room_info_dict.get('booking_room_types', []))
@@ -861,9 +911,11 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                                     
                                 req_warnings = card.get("requirement_satisfaction", {})
                                 if req_warnings:
+                                    req_tr = {"single_room": "Tek Kişilik Oda", "double_room": "Çift Kişilik Oda", "suite": "Suit Oda", "pool": "Havuz", "wifi": "Wi-Fi", "breakfast": "Kahvaltı", "parking": "Otopark", "wheelchair_accessible": "Engelli Erişimi", "pet_friendly": "Evcil Hayvan Dostu"}
                                     for req_key, req_status in req_warnings.items():
                                         if req_status == "UNKNOWN" or req_status == "MISSING":
-                                            warn_msg = f"{req_key.replace('_', ' ').capitalize()}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{req_key.replace('_', ' ').capitalize()}: Mevcut veri setinde doğrulanamadı."
+                                            translated_key = req_tr.get(req_key, req_key.replace('_', ' ').capitalize()) if t['code'] == 'tr' else req_key.replace('_', ' ').capitalize()
+                                            warn_msg = f"{translated_key}: Cannot be confirmed from the current dataset." if t['code'] != 'tr' else f"{translated_key}: Mevcut veri setinde doğrulanamadı."
                                             st.write(f"⚠️ **{warn_msg}**")
                                             
                             with c2:

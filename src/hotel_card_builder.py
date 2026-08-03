@@ -197,7 +197,7 @@ def build_hotel_cards(
                 "wheelchair_accessible": wheelchair,
                 "parking": parking,
                 "pet_friendly": pet_friendly,
-                "other": [a for a in amenities if isinstance(a, str)][:10]
+                "other": [a for a in amenities if isinstance(a, str) and not any(kw in a.lower() for kw in ["pool", "wifi", "internet", "breakfast", "parking", "wheelchair", "pet"])] [:10]
             },
             "amenities_source": "TripAdvisor amenities / enriched metadata" if amenities else "UNKNOWN",
             "room_info": {
