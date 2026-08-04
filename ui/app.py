@@ -31,9 +31,9 @@ from cmu_rag_answer import (
     clamp_selected_hotel_index,
     generate_conversational_answer,
     generate_llm_answer,
+    generate_out_of_scope_answer_stream,
     generate_review_answer,
     get_llm_intent_and_location,
-    next_hotel_index,
     resolve_hotel_selection,
     safe_map_link,
 )
@@ -548,7 +548,10 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
 
             elif intent == "out_of_scope":
                 answer_container = st.empty()
-                full_answer = "I am a hotel recommendation assistant. I cannot answer questions outside of hotel search and travel accommodations."
+                generator = generate_out_of_scope_answer_stream(prompt, t["code"], st.session_state.messages[:-1])
+                full_answer = sanitize_before_render(collect_llm_answer(generator))
+                if full_answer is None:
+                    full_answer = "I am a hotel recommendation assistant. I cannot answer questions outside of hotel search and travel accommodations."
                 answer_container.markdown(full_answer)
                 append_message({"role": "assistant", "content": full_answer})
                 st.rerun()
@@ -691,26 +694,65 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                     st.rerun()
 
                 elif intent in ["followup_other_hotel", "follow_up"]:
-                    if not last_cards:
-                        response_text = "I do not have previous hotel results to choose another hotel from. Please search for a city first."
-                    else:
-                        new_idx = next_hotel_index(last_cards, selected_idx)
-                        if new_idx is None:
-                            response_text = "I have shown all the hotels from the current search results. Please refine your search."
-                        else:
-                            st.session_state.selected_hotel_index = new_idx
-                            current_card = last_cards[new_idx]
-                            hotel_name = current_card.get('hotel_name', 'UNKNOWN')
-                            score = current_card.get('travelmind_score')
-                            try:
-                                score_text = f" It has a TravelMind score of {float(score):.1f}/100."
-                            except (TypeError, ValueError):
-                                score_text = ""
-                            response_text = f"The next hotel is **{hotel_name}**.{score_text}"
+                    all_cards = st.session_state.get("last_search_all_cards", [])
+                    shown_count = st.session_state.get("shown_hotel_count", len(last_cards))
+                    remaining_cards = all_cards[shown_count:shown_count + 3]
 
-                    answer_container.markdown(response_text)
-                    append_message({"role": "assistant", "content": response_text})
-                    st.rerun()
+                    if not all_cards:
+                        response_text = "I do not have previous hotel results to choose another hotel from. Please search for a city first."
+                        answer_container.markdown(response_text)
+                        append_message({"role": "assistant", "content": response_text})
+                        st.rerun()
+                    elif not remaining_cards:
+                        response_text = "I have already shown all the hotels available for this search. Please try a different city or adjust your requirements."
+                        answer_container.markdown(response_text)
+                        append_message({"role": "assistant", "content": response_text})
+                        st.rerun()
+                    else:
+                        from cmu_rag_answer import build_hotel_context
+                        stored_requirements = st.session_state.get("last_search_query_requirements", {})
+                        hotel_context_str = ""
+                        for i, result in enumerate(remaining_cards, start=1):
+                            hotel_context_str += build_hotel_context(prompt, result, i, lang_code="en") + "\n\n"
+
+                        generator = generate_llm_answer(
+                            query=prompt,
+                            hotel_context_str=hotel_context_str,
+                            chat_history=st.session_state.messages[:-1],
+                            location=effective_location,
+                            lang_code=t["code"],
+                            hotel_cards=remaining_cards,
+                            query_requirements=stored_requirements,
+                        )
+                        full_answer = collect_llm_answer(generator)
+                        validation = validate_answer(full_answer, remaining_cards, "hotel_search", effective_location, t["code"])
+                        final_display = validation["sanitized_answer"]
+
+                        final_display = sanitize_before_render(final_display)
+                        if final_display is None:
+                            from cmu_rag_answer import safe_card_based_fallback_answer
+                            final_display = safe_card_based_fallback_answer(
+                                user_query=prompt,
+                                hotel_cards=remaining_cards,
+                                query_requirements=stored_requirements,
+                                city=effective_location,
+                                language=t["code"],
+                            )
+
+                        st.session_state["last_hotel_cards"] = remaining_cards
+                        st.session_state["selected_hotel_index"] = 0
+                        st.session_state["shown_hotel_count"] = shown_count + len(remaining_cards)
+
+                        answer_container.markdown(final_display)
+                        for card in remaining_cards:
+                            render_hotel_card(card)
+
+                        append_message({
+                            "role": "assistant",
+                            "content": final_display,
+                            "hotels": remaining_cards,
+                        })
+                        st.rerun()
 
                 else:
                     response_text, selected_idx = build_grounded_followup_answer(
@@ -746,7 +788,8 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                         requested_location=locals().get("effective_location"),
                         effective_scores=locals().get("effective_scores"),
                     )
-                    sorted_cards = sorted(cards_json, key=lambda x: x.get("rank_score", 0.0), reverse=True)[:3]
+                    full_sorted_cards = sorted(cards_json, key=lambda x: x.get("rank_score", 0.0), reverse=True)
+                    sorted_cards = full_sorted_cards[:3]
 
                     answer_container = st.empty()
 
@@ -783,6 +826,9 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                     # Update session state with the new context immediately
                     st.session_state["last_hotel_cards"] = sorted_cards
                     st.session_state["selected_hotel_index"] = 0
+                    st.session_state["last_search_all_cards"] = full_sorted_cards
+                    st.session_state["shown_hotel_count"] = len(sorted_cards)
+                    st.session_state["last_search_query_requirements"] = query_requirements
                     if effective_location:
                         st.session_state["last_search_city"] = effective_location
                     if sorted_cards:

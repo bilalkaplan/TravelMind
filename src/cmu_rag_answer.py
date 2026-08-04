@@ -251,6 +251,32 @@ def clamp_selected_hotel_index(last_hotel_cards, selected_index=0) -> int:
     return index if 0 <= index < len(cards) else 0
 
 
+_HOTEL_NAME_STOPWORDS = {
+    "the", "a", "an", "of", "and", "by", "at", "in", "for",
+    "hotel", "hotels", "inn", "suites", "suite", "resort",
+    "collection", "luxury", "downtown", "airport", "hall",
+}
+
+
+def _significant_hotel_name_words(hotel_name_norm):
+    """Words in a normalized hotel name that actually distinguish it.
+
+    Real dataset names often embed the city (``"the joule dallas"``), which
+    a user's casual follow-up rarely repeats. Dropping stopwords and known
+    city tokens leaves the part someone would actually say out loud.
+    """
+    city_tokens = set()
+    for city in SUPPORTED_CITIES:
+        city_tokens.update(city.split())
+    return [
+        word
+        for word in hotel_name_norm.split()
+        if word not in _HOTEL_NAME_STOPWORDS
+        and word not in city_tokens
+        and len(word) >= 3
+    ]
+
+
 def find_referenced_hotel_index(
     last_hotel_cards,
     question="",
@@ -265,12 +291,21 @@ def find_referenced_hotel_index(
         if not reference or not hotel_name:
             return False
         without_the = hotel_name.removeprefix("the ")
-        return (
+        if (
             reference == hotel_name
             or reference in hotel_name
             or hotel_name in reference
             or (len(without_the) > 3 and without_the in reference)
-        )
+        ):
+            return True
+        # Fall back to the name's distinctive words alone, so "the joule
+        # hotel" still matches a card named "The Joule, Dallas" even
+        # though the user never repeated the city.
+        significant = _significant_hotel_name_words(hotel_name)
+        if not significant:
+            return False
+        reference_words = set(reference.split())
+        return all(word in reference_words for word in significant)
 
     if requested:
         for index, card in enumerate(cards):
@@ -1117,6 +1152,12 @@ SUPPORTED_CITIES = (
     "fort worth", "el paso",
 )
 
+OUT_OF_SCOPE_TERMS = (
+    "flight", "airfare", "plane ticket", "visa", "passport", "weather",
+    "itinerary", "car rental", "rent a car", "train ticket", "bus ticket",
+    "exchange rate", "currency rate", "phone brand", "write code", "programming",
+)
+
 
 def _initial_requested_hotel_name(query, city=None):
     """Extract conservative ``... Hotel`` names from initial city searches."""
@@ -1159,12 +1200,7 @@ def fast_route_query(user_query, session_state=None) -> dict:
     if get_deterministic_conversational_reply(query):
         return {"intent": "general_chat", "location": None, "query_requirements": {}}
 
-    out_of_scope_terms = (
-        "flight", "airfare", "plane ticket", "visa", "passport", "weather",
-        "itinerary", "car rental", "rent a car", "train ticket", "bus ticket",
-        "exchange rate", "currency rate", "phone brand", "write code", "programming",
-    )
-    if any(term in q for term in out_of_scope_terms):
+    if any(term in q for term in OUT_OF_SCOPE_TERMS):
         return {"intent": "out_of_scope"}
 
     if re.search(r"\b(?:price|prices|cost|costs|rate|rates|how much|per night|book|booking|availability)\b", q):
@@ -1178,6 +1214,12 @@ def fast_route_query(user_query, session_state=None) -> dict:
         ))
         or re.search(r"\b(?:reviews?|guests?|feedback|complaints?|noise|noisy)\b", q)
         or re.search(r"\bhow (?:is|are|was|were) (?:the )?(?:rooms?|service|cleanliness|value|staff)\b", q)
+        or re.search(
+            r"\b(?:did|do|does)\s+(?:people|visitors|travelers|reviewers)\s+"
+            r"(?:like|enjoy|recommend)\b",
+            q,
+        )
+        or re.search(r"\b(?:was|is)\s+it\s+(?:good|nice|great|worth it|clean|quiet)\b", q)
     )
     if review_question:
         return {"intent": "review_question", "requested_hotel_name": matched_name}
@@ -1203,7 +1245,18 @@ def fast_route_query(user_query, session_state=None) -> dict:
     if not found_city and re.search(r"\bbreakfast\b", q):
         return {"intent": "followup_breakfast", "requested_hotel_name": matched_name}
 
-    if not found_city and re.search(r"\b(?:next (?:one|option|hotel)|another (?:one|option|hotel)|other (?:one|option|hotel)|different hotel|any other options?)\b", q):
+    wants_other_hotels = re.search(
+        r"\b(?:next (?:one|option|hotel)|another (?:one|option|hotel)|"
+        r"other (?:one|option|hotel|hotels|options)|others|different hotel|"
+        r"any other options?|something else|anything else)\b",
+        q,
+    )
+    rejects_current_results = re.search(
+        r"\b(?:don t|dont|do not|didn t|didnt|did not|doesn t|doesnt|does not)\s+"
+        r"(?:like|want)\s+(?:these|those|this|them|it)\b",
+        q,
+    )
+    if not found_city and (wants_other_hotels or rejects_current_results):
         return {"intent": "follow_up"}
 
     global_score = bool(re.search(r"\b(?:how|what).*(?:score).*(?:calculat|determin|mean|work)|\bwhat is (?:the )?travelmind score\b", q))
@@ -1377,6 +1430,113 @@ def generate_out_of_scope_answer(user_query=None, language="en", chat_history=No
         "TravelMind currently supports hotel and accommodation recommendations only for supported cities. "
         "It does not provide live prices, availability, booking, flight, visa, or general travel planning information."
     )
+
+
+_OUT_OF_SCOPE_REPLIES = (
+    (
+        ("flight", "airfare", "plane ticket"),
+        "I'm sorry, I don't provide flight tickets or flight information at this moment. "
+        "I am here only to help you find and recommend the best hotels. If you tell me your "
+        "destination city, I can recommend great hotels!",
+    ),
+    (
+        ("visa", "passport"),
+        "I can't help with visa or passport requirements -- I'm a hotel recommendation assistant. "
+        "Let me know your destination city and I can suggest hotels there instead.",
+    ),
+    (
+        ("weather",),
+        "I don't have weather information. I can only help you find hotels in our supported cities.",
+    ),
+    (
+        ("itinerary",),
+        "I don't plan full travel itineraries, but I can recommend hotels for any of our "
+        "supported cities if that would help.",
+    ),
+    (
+        ("car rental", "rent a car"),
+        "I don't handle car rentals. I'm focused on hotel recommendations -- tell me a "
+        "supported city and I can help with that.",
+    ),
+    (
+        ("train ticket", "bus ticket"),
+        "I can't book train or bus tickets. I only provide hotel recommendations in our supported cities.",
+    ),
+    (
+        ("exchange rate", "currency rate"),
+        "I cannot provide information about finance or exchange rates. I am an assistant "
+        "specializing only in hotel recommendations and travel accommodations.",
+    ),
+    (
+        ("phone brand",),
+        "I am a hotel and travel assistant, so I cannot answer technology-related questions. "
+        "If you have a plan regarding accommodations, I would gladly help.",
+    ),
+    (
+        ("write code", "programming"),
+        "I'm not able to help with programming questions. I'm here purely for hotel and "
+        "accommodation recommendations.",
+    ),
+)
+
+
+def get_deterministic_out_of_scope_reply(query):
+    """Topic-aware canned reply for the most common off-topic categories.
+
+    Keeps repeated off-topic questions in one conversation from all getting
+    the exact same sentence back, without needing a model call for the
+    common cases already covered by ``OUT_OF_SCOPE_TERMS``.
+    """
+    q = normalize_hotel_reference(query)
+    for keywords, reply in _OUT_OF_SCOPE_REPLIES:
+        if any(keyword in q for keyword in keywords):
+            return reply
+    return None
+
+
+def generate_out_of_scope_answer_stream(query, lang_code, chat_history):
+    """Streaming, context-aware refusal for out-of-scope questions.
+
+    Mirrors ``generate_conversational_answer``: a fast deterministic reply
+    for known categories, otherwise a grounded local-model reply built from
+    ``build_out_of_scope_prompt`` instead of one repeated static sentence.
+    """
+    deterministic_reply = get_deterministic_out_of_scope_reply(query)
+    if deterministic_reply:
+        yield {"type": "answer", "content": deterministic_reply}
+        return
+    try:
+        import prompt_builders
+        prompt = prompt_builders.build_out_of_scope_prompt(target_language="English")
+
+        def make_request(client, model_id):
+            return client.chat.completions.create(
+                model=model_id,
+                messages=typing.cast(
+                    typing.Any,
+                    [{'role': 'system', 'content': prompt}]
+                    + get_truncated_history(chat_history)
+                    + [{'role': 'user', 'content': f"{query}\n/no_think"}],
+                ),
+                temperature=0.2,
+                max_tokens=120,
+                stream=True,
+                stop=["</answer>"],
+                extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+            )
+
+        response = create_chat_completion_with_retry(make_request)
+        emitted_answer = False
+        for chunk in stream_extract_answer(response, lang_code):
+            if chunk.get("type") == "answer" and chunk.get("content", "").strip():
+                emitted_answer = True
+            yield chunk
+        if not emitted_answer:
+            yield {"type": "answer", "content": generate_out_of_scope_answer()}
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        yield {"type": "answer", "content": generate_out_of_scope_answer()}
 
 def safe_card_based_fallback_answer(
     user_query=None,

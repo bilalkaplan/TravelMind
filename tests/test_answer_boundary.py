@@ -383,3 +383,17 @@ def test_fast_router_catches_required_review_questions():
         "intent": "review_question",
         "requested_hotel_name": "The Example Hotel",
     }
+
+
+def test_fast_router_matches_city_suffixed_hotel_names_without_the_city():
+    # Real dataset names embed the city (e.g. "The Joule, Dallas"), but a
+    # user's casual follow-up rarely repeats it.
+    state = {"last_hotel_cards": [{"hotel_name": "The Joule, Dallas"}]}
+
+    route = cmu_rag_answer.fast_route_query(
+        "did people like the joule hotel", state
+    )
+    assert route == {
+        "intent": "review_question",
+        "requested_hotel_name": "The Joule, Dallas",
+    }

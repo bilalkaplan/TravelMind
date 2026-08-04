@@ -17,7 +17,9 @@ from src.cmu_rag_answer import (
     fast_route_query,
     generate_conversational_answer,
     generate_followup_answer,
+    generate_out_of_scope_answer_stream,
     get_available_model_id,
+    get_deterministic_out_of_scope_reply,
     get_llm_intent_and_location,
     next_hotel_index,
     resolve_hotel_selection,
@@ -80,6 +82,8 @@ ROUTER_CARDS = [
         ("Does Arena Hotel have breakfast?", "followup_breakfast"),
         ("what is its phone number?", "specific_hotel_info"),
         ("tell me more", "specific_hotel_info"),
+        ("I didn't like these hotels, can you recommend others?", "follow_up"),
+        ("can you recommend others", "follow_up"),
     ],
 )
 def test_fast_router_context_matrix(query, expected_intent):
@@ -167,6 +171,54 @@ def test_conversational_greeting_skips_model(monkeypatch):
     chunks = list(generate_conversational_answer("hello", "en", []))
     assert chunks[0]["type"] == "answer"
     assert "TravelMind" in chunks[0]["content"]
+
+
+@pytest.mark.parametrize(
+    ("query", "expected_snippet"),
+    [
+        ("find me a flight to Boston", "flight"),
+        ("what is the weather in Boston?", "weather"),
+        ("what is the best phone brand?", "technology"),
+        ("tell me about exchange rates", "finance"),
+    ],
+)
+def test_out_of_scope_replies_are_topic_specific(query, expected_snippet):
+    reply = get_deterministic_out_of_scope_reply(query)
+    assert reply is not None
+    assert expected_snippet in reply
+
+
+def test_out_of_scope_known_topic_skips_model(monkeypatch):
+    monkeypatch.setattr(
+        rag_answer,
+        "create_chat_completion_with_retry",
+        lambda request: pytest.fail("known off-topic category must not start Foundry"),
+    )
+    chunks = list(
+        generate_out_of_scope_answer_stream("find me a flight to Boston", "en", [])
+    )
+    assert chunks[0]["type"] == "answer"
+    assert "flight" in chunks[0]["content"]
+
+
+def test_out_of_scope_unknown_topic_falls_back_to_model(monkeypatch):
+    def create(**kwargs):
+        assert kwargs["messages"][0]["content"]  # system prompt was built
+        return [_completion_chunk("<answer>I can only help with hotels.")]
+
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+    )
+    monkeypatch.setattr(
+        rag_answer,
+        "create_chat_completion_with_retry",
+        lambda request: request(client, "mock-model"),
+    )
+    chunks = list(
+        generate_out_of_scope_answer_stream("can you write me some python code", "en", [])
+    )
+    answer = "".join(c["content"] for c in chunks if c["type"] == "answer")
+    assert answer == "I can only help with hotels."
 
 
 @pytest.mark.parametrize(
