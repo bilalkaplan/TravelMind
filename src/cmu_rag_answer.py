@@ -932,13 +932,19 @@ def generate_review_answer(
         )
 
         def make_request(client, model_id):
+            # Deliberately no prior chat history: the review-answer prompt
+            # is a self-contained, tightly grounded single-turn task (hotel
+            # name + review evidence + question). Mixing in earlier turns
+            # about a different search (for example the original hotel-list
+            # query) confuses the small local model into blending topics.
             return client.chat.completions.create(
                 model=model_id,
                 messages=typing.cast(
                     typing.Any,
-                    [{"role": "system", "content": prompt}]
-                    + get_truncated_history(chat_history or [])
-                    + [{"role": "user", "content": f"{question}\n/no_think"}],
+                    [
+                        {"role": "system", "content": prompt},
+                        {"role": "user", "content": f"{question}\n/no_think"},
+                    ],
                 ),
                 temperature=0.15,
                 frequency_penalty=0.2,

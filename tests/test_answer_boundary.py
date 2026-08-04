@@ -1,5 +1,6 @@
 import inspect
 
+from src import answer_validator
 from src import cmu_rag_answer
 from src import prompt_builders
 
@@ -353,6 +354,62 @@ def test_review_generator_never_returns_an_empty_public_answer(monkeypatch):
         chunk["content"] for chunk in chunks if chunk["type"] == "answer"
     )
     assert "did not produce a reliable answer" in public_answer
+
+
+def test_generate_review_answer_excludes_prior_chat_history(monkeypatch):
+    # A prior turn about an unrelated search (a different topic/hotel set)
+    # must not be sent alongside the review prompt -- mixing them confuses
+    # the small local model into blending the two topics.
+    captured = {}
+
+    class _Completions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return [_Chunk("<answer>Guests praised the service.")]
+
+    class _Client:
+        class _Chat:
+            completions = _Completions()
+
+        chat = _Chat()
+
+    monkeypatch.setattr(
+        cmu_rag_answer,
+        "create_chat_completion_with_retry",
+        lambda make_request: make_request(_Client(), "test-model"),
+    )
+
+    list(
+        cmu_rag_answer.generate_review_answer(
+            {"hotel_name": "Example Hotel"},
+            [{"text": "The service was excellent."}],
+            "Did people like it?",
+            chat_history=[
+                {"role": "user", "content": "I need a hotel with a pool in Dallas"},
+                {"role": "assistant", "content": "Hotel A has a pool..."},
+            ],
+        )
+    )
+
+    assert len(captured["messages"]) == 2
+    assert captured["messages"][0]["role"] == "system"
+    assert captured["messages"][1]["content"].startswith("Did people like it?")
+    joined = " ".join(m["content"] for m in captured["messages"])
+    assert "pool in Dallas" not in joined
+
+
+def test_internal_analysis_leak_catches_generic_user_meta_commentary():
+    leaked = (
+        "The user is not looking for a hotel with a pool, but a hotel with "
+        "a pool in Dallas. The Joule Hotel in Dallas is a possible answer."
+    )
+    assert answer_validator.detect_internal_analysis(leaked) is True
+    assert (
+        answer_validator.detect_internal_analysis(
+            "The Joule, Dallas has a score of 91.7/100."
+        )
+        is False
+    )
 
 
 def test_all_answer_generators_define_the_closing_tag_stop_sequence():

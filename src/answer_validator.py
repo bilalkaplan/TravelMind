@@ -100,6 +100,26 @@ def _split_sentences(answer: str) -> list:
         if sentence.strip()
     ]
 
+def detect_repetition_loop(answer: str, min_repeats: int = 3) -> bool:
+    """Catch degenerate output that repeats the same sentence several times.
+
+    Small local models occasionally fall into a loop and repeat one clause
+    verbatim many times instead of answering (observed live for open-ended
+    review questions). A legitimate multi-hotel answer never repeats one
+    full sentence three times, so this is a low-false-positive signal that
+    generation failed, independent of what the repeated content claims.
+    """
+    counts: dict[str, int] = {}
+    for sentence in _split_sentences(answer):
+        key = _normalize_claim_text(sentence)
+        if not key or len(key.split()) < 3:
+            continue
+        counts[key] = counts.get(key, 0) + 1
+        if counts[key] >= min_repeats:
+            return True
+    return False
+
+
 def detect_internal_analysis(answer: str) -> bool:
     forbidden = [
         "let me check", "düşünüyor...", "let's check",
@@ -119,7 +139,18 @@ def detect_internal_analysis(answer: str) -> bool:
         "kullanıcı arıyor", "kullanıcı istiyor"
     ]
     ans_lower = answer.lower()
-    return any(f in ans_lower for f in forbidden)
+    if any(f in ans_lower for f in forbidden):
+        return True
+    # Third-person meta-commentary about "the user" leaks the model's
+    # reasoning even when it doesn't match one of the fixed phrases above
+    # (e.g. "The user is not looking for a hotel with a pool, but...").
+    if re.search(
+        r"\bthe user (?:is|was|does not|doesn't|wants?|needs?|asked|is asking|"
+        r"is looking for|is not looking for)\b",
+        ans_lower,
+    ):
+        return True
+    return False
 
 def detect_placeholders(answer: str) -> bool:
     placeholders = [
@@ -325,11 +356,20 @@ def find_fabricated_links(answer: str, hotel_cards: list, evidence_text: str = "
         fabricated.append(raw_link)
     return fabricated
 
-def build_safe_fallback_answer(target_language: str, intent: str, hotel_cards: list = None) -> str:
+def build_safe_fallback_answer(
+    target_language: str,
+    intent: str,
+    hotel_cards: list = None,
+    requested_location: str | None = None,
+) -> str:
     # Just a wrapper if intent is hotel_search
     if intent == "hotel_search":
         from cmu_rag_answer import safe_card_based_fallback_answer
-        return safe_card_based_fallback_answer(hotel_cards=hotel_cards or [], language=target_language)
+        return safe_card_based_fallback_answer(
+            hotel_cards=hotel_cards or [],
+            city=requested_location,
+            language=target_language,
+        )
     
     if intent == "price":
         if target_language.lower() in ["turkish", "tr"]:
@@ -384,6 +424,13 @@ def validate_answer(
         add_issue(
             "internal_analysis_leak",
             "Model leaked internal thoughts.",
+            blocks_output=True,
+        )
+
+    if detect_repetition_loop(answer):
+        add_issue(
+            "repetition_loop",
+            "Model output degenerated into a repeated sentence.",
             blocks_output=True,
         )
 
@@ -501,7 +548,9 @@ def validate_answer(
 
     sanitized = answer
     if blocking_issues:
-        sanitized = build_safe_fallback_answer(target_language, intent, hotel_cards)
+        sanitized = build_safe_fallback_answer(
+            target_language, intent, hotel_cards, requested_location
+        )
 
     return {
         "passed": len(issues) == 0,
