@@ -39,25 +39,23 @@ _REQUIREMENT_ALIASES = {
 }
 
 _QUERY_FEATURE_PATTERNS = {
-    "breakfast": (r"\bbreakfast\b", r"\bkahvalt[ıi]\b"),
+    "breakfast": (r"\bbreakfast\b", r"\bmorning meal\b"),
     "single_room": (
         r"\bsingle(?:\s+(?:room|bed))?\b",
-        r"\btek\s+ki[sş]ilik\b",
     ),
     "double_room": (
         r"\bdouble(?:\s+(?:room|bed))?\b",
         r"\b(?:king|queen|twin|full)\s+(?:room|bed)\b",
-        r"\b(?:çift|cift|iki)\s+ki[sş]ilik\b",
     ),
-    "suite": (r"\bsuite\b", r"\bsuit(?:\s+oda)?\b", r"\bkral\s+dairesi\b"),
-    "pool": (r"\bpool\b", r"\bswimming\s+pool\b", r"\bhavuz\b"),
+    "suite": (r"\bsuite\b", r"\bpresidential(?:\s+suite)?\b"),
+    "pool": (r"\bpool\b", r"\bswimming\s+pool\b"),
     "wifi": (r"\bwi[ -]?fi\b", r"\bwireless\b", r"\binternet\b"),
     "wheelchair_accessible": (
         r"\bwheelchair(?:\s+accessible)?\b",
         r"\baccessible\b",
-        r"\bengelli\b",
+        r"\bhandicap\b",
     ),
-    "parking": (r"\bparking\b", r"\bvalet\b", r"\bgarage\b", r"\botopark\b"),
+    "parking": (r"\bparking\b", r"\bvalet\b", r"\bgarage\b"),
 }
 
 
@@ -188,17 +186,17 @@ CLEANLINESS_NEGATIVE_KEYWORDS = [
 ]
 
 LOCATION_WORDS_TO_IGNORE = {
-    "otel", "hotel", "hoteli", "oteli", "temiz", "clean", "konum", "location",
-    "iyi", "good", "çift", "cift", "kişilik", "kisilik", "double", "bed", "yatak",
-    "oda", "room", "arıyorum", "ariyorum", "istiyorum", "looking", "want", "with",
-    "and", "for", "the", "bir", "ve", "ile", "için", "icin", "puan", "rating",
-    "score", "skor",
+    "hotel", "clean", "location",
+    "good", "double", "bed",
+    "room", "looking", "want", "with",
+    "and", "for", "the", "rating",
+    "score", "find",
 }
 
 def normalize_text(text):
     text = str(text).lower()
     text = text.replace("'", " ").replace("’", " ")
-    text = re.sub(r"[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ\s]", " ", text)
+    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
 
@@ -226,38 +224,35 @@ def score_location_match(query, location, requested_location=None):
         location_text = normalize_text(location)
         requested_text = normalize_text(requested_location)
         if not location_text:
-            return None, "Otelin konum bilgisi veri setinde bulunamadı."
+            return None, "Location data not found in dataset."
         requested_city = requested_text.split(",", 1)[0].strip()
         if requested_text in location_text or (
             requested_city and requested_city in location_text
         ):
-            return 100, f"Konum eşleşti: {requested_location}"
-        return 0, f"Otel istenen konumda değil: {requested_location}"
+            return 100, f"Location matched: {requested_location}"
+        return 0, f"Hotel is not in the requested location: {requested_location}"
 
     tokens = extract_possible_location_tokens(query)
     location_text = normalize_text(location)
     if not tokens:
-        return None, "Kullanıcı belirli ülke/şehir/bölge belirtmedi."
+        return None, "User did not specify a specific country/city/region."
     matched_tokens = [token for token in tokens if token in location_text]
     if matched_tokens:
-        return 100, f"Konum eşleşti: {', '.join(matched_tokens)}"
-    return 0, "Kullanıcının belirttiği konum bu kaydın location alanında bulunamadı."
+        return 100, f"Location matched: {', '.join(matched_tokens)}"
+    return 0, "The requested location was not found in this record's location field."
 
 def score_room_match(query, room_types_list, query_requirements=None):
     query_text = normalize_text(query)
 
     if query_requirements is None:
         requested_types = []
-        if any(kw in query_text for kw in ["suite", "suit oda", "kral dairesi"]):
+        if any(kw in query_text for kw in ["suite", "presidential"]):
             requested_types.append("suite")
         if any(
             kw in query_text
             for kw in [
-                "çift kişilik",
-                "cift kisilik",
                 "double bed",
                 "double room",
-                "iki kişilik",
                 "queen bed",
                 "king bed",
                 "full bed",
@@ -266,7 +261,7 @@ def score_room_match(query, room_types_list, query_requirements=None):
             requested_types.append("double_room")
         if any(
             kw in query_text
-            for kw in ["tek kişilik", "single room", "tek kisilik"]
+            for kw in ["single room", "single bed"]
         ):
             requested_types.append("single_room")
     else:
@@ -278,16 +273,16 @@ def score_room_match(query, room_types_list, query_requirements=None):
         ]
 
     if not requested_types:
-        return None, "Kullanıcı oda/yatak tipi için özel bir tercih belirtmedi."
+        return None, "User did not specify a room/bed type preference."
 
     if not room_types_list:
-        return None, "Yatak tipi bilgisi veri setinde bulunamadı."
+        return None, "Bed type data not found in dataset."
 
     room_text = normalize_text(" ".join(str(r) for r in room_types_list))
     matchers = {
-        "suite": ("suite", "suit", "kral", "presidential"),
-        "double_room": ("double", "çift", "twin", "king", "queen", "full"),
-        "single_room": ("single", "tek"),
+        "suite": ("suite", "presidential"),
+        "double_room": ("double", "twin", "king", "queen", "full"),
+        "single_room": ("single", "twin"),
     }
     matches = sum(
         any(keyword in room_text for keyword in matchers[room_type])
@@ -295,10 +290,10 @@ def score_room_match(query, room_types_list, query_requirements=None):
     )
     score = matches / len(requested_types) * 100
     if matches == len(requested_types):
-        return score, "Kullanıcının tüm oda tipi tercihleri kayıtlarla eşleşti."
+        return score, "All requested room types matched the records."
     if matches:
-        return score, "Kullanıcının oda tipi tercihleri kısmen eşleşti."
-    return 0, "İstenen oda tipleri otelin kayıtlı oda listesinde bulunmuyor."
+        return score, "Requested room types partially matched."
+    return 0, "Requested room types are not in the hotel's recorded list."
 
 
 def score_amenities_match(query, amenities_list, query_requirements=None):
@@ -314,7 +309,7 @@ def score_amenities_match(query, amenities_list, query_requirements=None):
         amenities_list = [amenities_list] if amenities_list.strip() else []
 
     if not amenities_known or not isinstance(amenities_list, list):
-        return None, "Olanak (amenity) bilgisi veri setinde bulunamadı."
+        return None, "Amenity data not found in dataset."
 
     query_text = normalize_text(query)
     am_str = normalize_text(" ".join(str(amenity) for amenity in amenities_list))
@@ -322,15 +317,14 @@ def score_amenities_match(query, amenities_list, query_requirements=None):
     requests = []
     amenity_keywords = {
         "wifi": ("wifi", "wi fi", "internet", "wireless"),
-        "pool": ("pool", "havuz", "swimming"),
-        "breakfast": ("breakfast", "kahvaltı", "morning meal"),
-        "parking": ("parking", "park", "valet", "garage", "otopark"),
+        "pool": ("pool", "swimming"),
+        "breakfast": ("breakfast", "morning meal"),
+        "parking": ("parking", "valet", "garage"),
         "wheelchair_accessible": (
             "wheelchair",
             "accessible",
             "handicap",
             "disabled",
-            "engelli",
         ),
     }
     if query_requirements is not None:
@@ -347,11 +341,11 @@ def score_amenities_match(query, amenities_list, query_requirements=None):
 
     if not requests:
         if query_requirements is not None:
-            return None, "Kullanıcı belirli bir olanak tercihi belirtmedi."
+            return None, "User did not specify a specific amenity preference."
         # Fallback to general amenity count
         core = ["wifi", "pool", "breakfast", "parking", "restaurant", "bar", "fitness"]
         matches = sum(1 for c in core if c in am_str)
-        return min((matches / 3.0) * 100, 100), f"Tesisin genel olanak zenginliği ({len(amenities_list)} adet) değerlendirildi."
+        return min((matches / 3.0) * 100, 100), f"General amenity richness evaluated ({len(amenities_list)} amenities found)."
         
     matches = 0
     for _request_name, keywords in requests:
@@ -360,19 +354,19 @@ def score_amenities_match(query, amenities_list, query_requirements=None):
             
     score = (matches / len(requests)) * 100
     if score == 100:
-        return score, "Kullanıcının tüm olanak istekleri karşılandı."
+        return score, "All user amenity requests were met."
     elif score > 0:
-        return score, "Kullanıcının olanak istekleri kısmen karşılandı."
+        return score, "User amenity requests were partially met."
     else:
-        return 0, "Kullanıcının olanak istekleri karşılanmıyor."
+        return 0, "User amenity requests were not met."
 
 def score_hotel_class(hotel_class_str):
     value = to_float(hotel_class_str)
     if value is None:
-        return None, "Otel sınıfı (yıldız) bilgisi veri setinde bulunamadı."
+        return None, "Hotel class (stars) data not found in dataset."
     value = max(0, min(value, 5))
     score = (value / 5.0) * 100
-    return score, f"Otel sınıfı veri setinden geldi: {value} yıldız."
+    return score, f"Hotel class sourced from dataset: {value} stars."
 
 def normalize_review_rating(mean_rating):
     """Map an available mean on the 1-5 scale to a 0-100 score."""
@@ -386,8 +380,8 @@ def normalize_review_rating(mean_rating):
 def score_review_rating(mean_rating, label):
     score = normalize_review_rating(mean_rating)
     if score is None:
-        return None, f"{label} puanı veri setinde bulunamadı."
-    return score, f"Ortalama {label.lower()} puanı: {float(mean_rating):.2f} / 5."
+        return None, f"{label} rating not found in dataset."
+    return score, f"Average {label.lower()} rating: {float(mean_rating):.2f} / 5."
 
 
 def score_review_volume(review_count, maximum_review_count=None):
@@ -396,14 +390,14 @@ def score_review_volume(review_count, maximum_review_count=None):
         MAX_REVIEW_COUNT if maximum_review_count is None else maximum_review_count
     )
     if value is None or value <= 0:
-        return None, "Yorum sayısı bilgisi veri setinde yok."
+        return None, "Review count data not found in dataset."
     if maximum is None or maximum <= 0:
         maximum = value
     score = min(math.log1p(value) / math.log1p(maximum) * 100, 100)
     return (
         score,
-        "Yorum hacmi veri setindeki maksimuma göre normalize edildi: "
-        f"{int(value)} yorum.",
+        "Review volume normalized against dataset maximum: "
+        f"{int(value)} reviews.",
     )
 
 
@@ -453,20 +447,20 @@ def get_hotel_review_stats(metadata):
 
 def user_asked_cleanliness(query):
     query_text = normalize_text(query)
-    terms = ["temiz", "clean", "hygiene", "cleanliness"]
+    terms = ["clean", "hygiene", "cleanliness"]
     return any(term in query_text for term in terms)
 
 def score_cleanliness_comment(query, text):
     if not user_asked_cleanliness(query):
-        return None, "Kullanıcı temizlik için özel bir tercih belirtmedi."
+        return None, "User did not specify a preference for cleanliness."
     comment_text = normalize_text(text)
     has_positive = any(word in comment_text for word in CLEANLINESS_POSITIVE_KEYWORDS)
     has_negative = any(word in comment_text for word in CLEANLINESS_NEGATIVE_KEYWORDS)
     if has_negative:
-        return 20, "Yorum/metin içinde temizlik açısından olumsuz ifade bulundu."
+        return 20, "Negative statement regarding cleanliness found in text."
     if has_positive:
-        return 100, "Yorum/metin içinde temizlik açısından olumlu ifade bulundu."
-    return 50, "Temizlik hakkında açık bir ifade bulunamadı."
+        return 100, "Positive statement regarding cleanliness found in text."
+    return 50, "No clear statement regarding cleanliness found."
 
 def _merge_text_values(*collections):
     merged = []
@@ -529,16 +523,16 @@ def calculate_travelmind_score(
 
     review_stats = get_hotel_review_stats(metadata)
     overall_score, overall_reason = score_review_rating(
-        review_stats.get("overall"), "Genel yorum"
+        review_stats.get("overall"), "Overall"
     )
     service_score, service_reason = score_review_rating(
-        review_stats.get("service"), "Servis"
+        review_stats.get("service"), "Service"
     )
     review_rooms_score, review_rooms_reason = score_review_rating(
-        review_stats.get("rooms"), "Oda"
+        review_stats.get("rooms"), "Rooms"
     )
     review_cleanliness_score, review_cleanliness_reason = score_review_rating(
-        review_stats.get("cleanliness"), "Temizlik"
+        review_stats.get("cleanliness"), "Cleanliness"
     )
     review_volume_score, review_volume_reason = score_review_volume(
         review_stats.get("review_count")
@@ -549,20 +543,20 @@ def calculate_travelmind_score(
     components = []
 
     component_values = (
-        ("location_match", "Konum Uyumu", location_score, location_reason),
-        ("hotel_class", "Otel Sınıfı", hotel_class_score, hotel_class_reason),
-        ("amenities_match", "Olanaklar Eşleşmesi", amenities_score, amenities_reason),
-        ("room_type_match", "Oda Tipi Eşleşmesi", room_score, room_reason),
-        ("review_overall", "Genel Yorum Puanı", overall_score, overall_reason),
-        ("review_service", "Servis Yorum Puanı", service_score, service_reason),
-        ("review_rooms", "Oda Yorum Puanı", review_rooms_score, review_rooms_reason),
+        ("location_match", "Location Match", location_score, location_reason),
+        ("hotel_class", "Hotel Class", hotel_class_score, hotel_class_reason),
+        ("amenities_match", "Amenities Match", amenities_score, amenities_reason),
+        ("room_type_match", "Room Type Match", room_score, room_reason),
+        ("review_overall", "Overall Review Rating", overall_score, overall_reason),
+        ("review_service", "Service Review Rating", service_score, service_reason),
+        ("review_rooms", "Rooms Review Rating", review_rooms_score, review_rooms_reason),
         (
             "review_cleanliness",
-            "Temizlik Yorum Puanı",
+            "Cleanliness Review Rating",
             review_cleanliness_score,
             review_cleanliness_reason,
         ),
-        ("review_volume", "Yorum Hacmi", review_volume_score, review_volume_reason),
+        ("review_volume", "Review Volume", review_volume_score, review_volume_reason),
     )
 
     missing_signals = []
@@ -601,32 +595,32 @@ def build_strengths(result):
     
     hotel_class_str = metadata.get("hotel_class", "")
     if "4." in hotel_class_str or "5." in hotel_class_str:
-        strengths.append("Yüksek yıldızlı, premium bir otel (Premium classification).")
+        strengths.append("High-star, premium hotel classification.")
         
     amenities = metadata.get("amenities", [])
     if isinstance(amenities, dict):
         amenities = [k for k, v in amenities.items() if v == "YES"]
     if len(amenities) >= 4:
-        strengths.append("Otel olanakları (amenities) açısından oldukça zengin.")
+        strengths.append("Rich in hotel amenities.")
         
     try:
         review_count = int(metadata.get("review_count_total", 0))
         if review_count > 500:
-            strengths.append(f"Ziyaretçiler tarafından çok fazla ({review_count}) değerlendirilmiş, güvenilir.")
+            strengths.append(f"Highly reviewed and reliable ({review_count} reviews).")
     except (ValueError, TypeError):
         pass
 
     if any(k in text for k in CLEANLINESS_POSITIVE_KEYWORDS):
-        strengths.append("Yorumlarda temizlikle ilgili belirgin olumlu ifadeler var.")
+        strengths.append("Reviews contain distinctly positive statements about cleanliness.")
         
-    if any(k in text for k in ["central", "midtown", "located", "metro", "subway", "merkezi"]):
-        strengths.append("Yorumlarda merkezi ve ulaşıma elverişli konum vurgusu var.")
+    if any(k in text for k in ["central", "midtown", "located", "metro", "subway"]):
+        strengths.append("Reviews highlight a central and accessible location.")
         
-    if any(k in text for k in ["staff", "friendly", "helpful", "service", "personel"]):
-        strengths.append("Yorumlarda personel veya servisle ilgili olumlu sinyaller var.")
+    if any(k in text for k in ["staff", "friendly", "helpful", "service"]):
+        strengths.append("Positive signals regarding staff or service in reviews.")
         
     if not strengths:
-        strengths.append("Bu otel, sorgunuza en uygun TravelMind uygunluk skorunu aldığı için önerildi.")
+        strengths.append("Recommended due to the highest TravelMind suitability score for your query.")
         
     return strengths[:4]
 
@@ -637,21 +631,21 @@ def build_cautions(result):
     
     hotel_class_str = metadata.get("hotel_class", "")
     if "1." in hotel_class_str or "2." in hotel_class_str:
-        cautions.append("Otelin sınıfı/yıldız değeri düşük. Lüks bir deneyim sunmayabilir.")
+        cautions.append("Low hotel class/star rating. May not offer a luxury experience.")
 
     if any(k in text for k in CLEANLINESS_NEGATIVE_KEYWORDS):
-        cautions.append("Bazı yorumlarda temizlikle ilgili olumsuz ifadeler veya şikayetler yer almış.")
+        cautions.append("Some reviews contain negative statements or complaints about cleanliness.")
         
     if any(k in text for k in ["small room", "extremely small", "tiny"]):
-        cautions.append("Bazı yorumlarda odaların çok küçük olabileceği belirtilmiş.")
+        cautions.append("Some reviews indicate that the rooms may be very small.")
         
-    if any(k in text for k in ["noisy", "noise", "loud", "gürültü"]):
-        cautions.append("Bazı yorumlarda dışarıdan veya içeriden gürültü problemi olabileceği belirtilmiş.")
+    if any(k in text for k in ["noisy", "noise", "loud"]):
+        cautions.append("Some reviews mention potential noise issues.")
         
     if any(k in text for k in ["over-booked", "overbooked"]):
-        cautions.append("Bazı yorumlarda rezervasyon (overbooking) problemi geçtiği görülmüş.")
+        cautions.append("Some reviews mention overbooking issues.")
         
-    if any(k in text for k in ["rude", "unhelpful", "horrible service", "kaba"]):
-        cautions.append("Bazı yorumlarda personelin tavrıyla ilgili olumsuz ifadeler yer almış.")
+    if any(k in text for k in ["rude", "unhelpful", "horrible service"]):
+        cautions.append("Some reviews contain negative statements regarding staff attitude.")
         
     return cautions[:3]

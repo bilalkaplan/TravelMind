@@ -168,17 +168,17 @@ def build_review_group_chunk(hotel_row, review_group, group_index):
 
 def main():
     if not HOTELS_PATH.exists():
-        print("Hotels dosyası bulunamadı:", HOTELS_PATH)
+        print("Hotels file not found:", HOTELS_PATH)
         return
 
     if not REVIEWS_MERGED_PATH.exists():
-        print("Merged reviews dosyası bulunamadı:", REVIEWS_MERGED_PATH)
+        print("Merged reviews file not found:", REVIEWS_MERGED_PATH)
         return
 
-    print("CMU hotel subset okunuyor...")
+    print("Reading CMU hotel subset...")
     hotels_df = pd.read_csv(HOTELS_PATH)
 
-    print("CMU merged review subset okunuyor...")
+    print("Reading CMU merged review subset...")
     reviews_df = pd.read_csv(REVIEWS_MERGED_PATH)
 
     hotels_df["hotel_id"] = hotels_df["hotel_id"].astype(str)
@@ -190,7 +190,7 @@ def main():
     if enriched_path.exists():
         with open(enriched_path, "r", encoding="utf-8") as f:
             enriched_raw = json.load(f)
-        print(f"{len(enriched_raw)} adet metadata verisi okundu.")
+        print(f"Read {len(enriched_raw)} metadata entries.")
 
     hotel_lookup = {str(row["hotel_id"]): row for _, row in hotels_df.iterrows()}
 
@@ -199,7 +199,7 @@ def main():
     review_group_count = 0
 
     with open(OUTPUT_PATH, "w", encoding="utf-8") as file:
-        print("Hotel profile chunk'ları oluşturuluyor...")
+        print("Creating hotel profile chunks...")
 
         for _, hotel in hotels_df.iterrows():
             hotel_id = str(hotel["hotel_id"])
@@ -240,7 +240,7 @@ def main():
             chunk_count += 1
             hotel_profile_count += 1
 
-        print("Review group chunk'ları oluşturuluyor...")
+        print("Creating review group chunks...")
 
         for hotel_id, group in reviews_df.groupby("hotel_id"):
             hotel_row = hotel_lookup.get(str(hotel_id))
@@ -296,7 +296,7 @@ def main():
                 review_group_count += 1
 
             if review_group_count % 1000 == 0:
-                print(f"Review group chunk sayısı: {review_group_count}")
+                print(f"Review group chunk count: {review_group_count}")
 
     report = f"""TravelMind RAG - CMU Chunk Report
 
@@ -324,7 +324,7 @@ Interpretation:
 
     REPORT_PATH.write_text(report, encoding="utf-8")
 
-    print("\nCMU chunk oluşturma tamamlandı.")
+    print("\nCMU chunk creation completed.")
     print(f"Hotel profile chunks: {hotel_profile_count}")
     print(f"Review group chunks: {review_group_count}")
     print(f"Total chunks: {chunk_count}")

@@ -132,8 +132,8 @@ from cmu_rag_answer import fast_route_query
 check("fast route price", fast_route_query("What is the price?")["intent"] == "price_question")
 check("fast route pool", fast_route_query("Does it have a pool?")["intent"] == "followup_pool")
 check("fast route next/other hotel", fast_route_query("Show me the other hotel")["intent"] == "follow_up")
-check("fast route unsupported location", fast_route_query("Paris'te otel öner")["intent"] == "unsupported_location")
-check("fast route fell through", fast_route_query("Otel öner") is None)
+check("fast route unsupported location", fast_route_query("Suggest a hotel in Paris")["intent"] == "unsupported_location")
+check("fast route fell through", fast_route_query("Suggest a hotel") is None)
 
 # ── 14. Prompt Builders Safety ──
 print("\n[14] Prompt Builders Safety")

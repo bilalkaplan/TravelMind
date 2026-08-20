@@ -13,23 +13,22 @@ OPTIONAL_MATCH_BOOST = 25.0
 
 AMENITY_FEATURE_KEYWORDS = {
     "wifi": ("wifi", "wi fi", "internet", "wireless"),
-    "breakfast": ("breakfast", "kahvaltı", "morning meal"),
-    "pool": ("pool", "havuz", "swimming"),
+    "breakfast": ("breakfast", "morning meal"),
+    "pool": ("pool", "swimming"),
     "wheelchair_accessible": (
         "wheelchair",
         "accessible",
         "handicap",
         "disabled",
-        "engelli",
     ),
-    "parking": ("parking", "park", "valet", "garage", "otopark"),
-    "pet_friendly": ("pet", "dog", "cat", "evcil"),
+    "parking": ("parking", "park", "valet", "garage"),
+    "pet_friendly": ("pet", "dog", "cat"),
 }
 
 ROOM_FEATURE_KEYWORDS = {
-    "single_room": ("single", "tek"),
-    "double_room": ("double", "çift", "twin", "king", "queen", "full"),
-    "suite": ("suite", "suit", "presidential", "kral"),
+    "single_room": ("single",),
+    "double_room": ("double", "twin", "king", "queen", "full"),
+    "suite": ("suite", "presidential"),
 }
 
 

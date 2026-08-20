@@ -27,9 +27,13 @@ def search_hotel_info(hotel_name, city):
             for r in results:
                 context += f"- {r.get('body', '')}\n"
             return context
-        except Exception:
-            print("DuckDuckGo Limit/Timeout! 20s bekleniyor...")
-            time.sleep(20)
+        except Exception as e:
+            if "RateLimit" in str(e) or "Timeout" in str(e) or "429" in str(e):
+                print(f"DuckDuckGo Limit/Timeout! Waiting 20s... Error: {e}")
+                time.sleep(20)
+            else:
+                print(f"Network error (internet dropped?). Waiting 30s before retry... Error: {e}")
+                time.sleep(30)
 
 def extract_with_openai(api_key, context, hotel_name):
     from openai import OpenAI
@@ -103,7 +107,7 @@ def extract_with_openrouter(api_key, context, hotel_name):
             return json.loads(text.strip())
         except Exception as e:
             if "429" in str(e):
-                print(f"  -> OpenRouter Rate Limit aşıldı, 20 saniye bekleniyor... (Deneme {attempt+1}/10)")
+                print(f"  -> OpenRouter Rate Limit exceeded, waiting 20s... (Attempt {attempt+1}/10)")
                 time.sleep(20)
             else:
                 print(f"OpenRouter API error: {e}")
@@ -147,21 +151,21 @@ def extract_with_gemini(api_key, context, hotel_name):
             return json.loads(text.strip())
         except Exception as e:
             if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "quota" in str(e).lower():
-                print(f"  -> Gemini Kota/Limit, 30 saniye bekleniyor... Hata: {e}")
+                print(f"  -> Gemini Quota/Limit, waiting 30s... Error: {e}")
                 time.sleep(30)
             else:
-                print(f"  -> Network / Gemini error, 20 saniye bekleniyor... Hata: {e}")
+                print(f"  -> Network / Gemini error, waiting 20s... Error: {e}")
                 time.sleep(20)
 
 def extract_with_regex(context, hotel_name):
     import re
-    # 1. Telefon Numarası bulma (Regex)
+    # 1. Finding Phone Number (Regex)
     phone = None
     phone_match = re.search(r'(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}', context)
     if phone_match:
         phone = phone_match.group(0)
         
-    # 2. Amenities (İmkanlar) bulma (Kelime havuzu tabanlı)
+    # 2. Finding Amenities (Keyword pool based)
     amenities = []
     amenity_keywords = {
         "Wi-Fi": ["wi-fi", "wifi", "internet", "wireless"],
@@ -177,7 +181,7 @@ def extract_with_regex(context, hotel_name):
         if any(kw in context_lower for kw in kws):
             amenities.append(am)
             
-    # 3. Room Types bulma (Kelime havuzu tabanlı)
+    # 3. Finding Room Types (Keyword pool based)
     room_types = []
     room_keywords = {
         "Standard Room": ["standard", "basic"],
@@ -244,12 +248,12 @@ def main():
     import os
     import json
     
-    print("TravelMind Veri Zenginleştirme Modülü")
-    print("1) OpenRouter API (Tamamen Ücretsiz Modeller)")
+    print("TravelMind Data Enrichment Module")
+    print("1) OpenRouter API (Completely Free Models)")
     print("2) OpenAI (ChatGPT Plus) API")
     print("3) Google Gemini API")
-    print("4) Offline NLP / Regex Extractor (API GEREKTİRMEZ - HIZLI)")
-    print("5) G4F (GPT4Free) API - Banlanmayan Bedava LLM Ağı!")
+    print("4) Offline NLP / Regex Extractor (NO API REQUIRED - FAST)")
+    print("5) G4F (GPT4Free) API - Free Unbanned LLM Network!")
     
     choice = "5"
     api_key = ""
@@ -260,11 +264,11 @@ def main():
     elif len(sys.argv) == 2:
         choice = sys.argv[1].strip()
     else:
-        choice = input("Lütfen kullanmak istediğiniz servisi seçin (1, 2, 3, 4 veya 5): ").strip()
+        choice = input("Please select the service you want to use (1, 2, 3, 4 or 5): ").strip()
         if choice in ["1", "2", "3"]:
-            api_key = input("Lütfen seçtiğiniz servisin API Key'ini yapıştırın: ").strip()
+            api_key = input("Please paste the API Key of the selected service: ").strip()
             if not api_key:
-                print("API Key girmediniz, çıkış yapılıyor.")
+                print("No API Key entered, exiting.")
                 return
                 
     METADATA_FILE = 'data/cmu_hotel_metadata.json'
@@ -274,7 +278,7 @@ def main():
         metadata = json.load(f)
         
     total_hotels = len(metadata)
-    print(f"Toplam {total_hotels} otel bulundu. Veri çekme başlatılıyor...\n")
+    print(f"Total {total_hotels} hotels found. Starting data extraction...\n")
     
     if os.path.exists(RAW_ENRICHED_FILE):
         with open(RAW_ENRICHED_FILE, 'r', encoding='utf-8') as f:
@@ -294,11 +298,11 @@ def main():
         if key in existing_data:
             continue
             
-        print(f"[{i}/{total_hotels}] Otel işleniyor: {hotel_name}")
+        print(f"[{i}/{total_hotels}] Processing hotel: {hotel_name}")
         context = search_hotel_info(hotel_name, city)
         
         if not context:
-            print(f"  -> {hotel_name} için arama sonucu bulunamadı.")
+            print(f"  -> No search results found for {hotel_name}.")
             continue
             
         extracted_data = None
@@ -316,7 +320,7 @@ def main():
             time.sleep(2)
         
         if not extracted_data:
-            print(f"  -> {hotel_name} için veriyi çıkaramadı. Atlanıyor.")
+            print(f"  -> Could not extract data for {hotel_name}. Skipping.")
             continue
             
         existing_data[key] = {
@@ -330,7 +334,7 @@ def main():
         with open(RAW_ENRICHED_FILE, 'w', encoding='utf-8') as f:
             json.dump(existing_data, f, ensure_ascii=False, indent=2)
         
-    print("\nİşlem tamamlandı! Veriler hotel_enriched_raw.json dosyasına kaydedildi.")
+    print("\nProcess completed! Data saved to hotel_enriched_raw.json.")
 
 if __name__ == "__main__":
     main()
