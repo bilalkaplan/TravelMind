@@ -1,5 +1,4 @@
 import os
-import sys
 import json
 import time
 from ddgs import DDGS
@@ -28,13 +27,9 @@ def search_hotel_info(hotel_name, city):
             for r in results:
                 context += f"- {r.get('body', '')}\n"
             return context
-        except Exception as e:
-            if "RateLimit" in str(e) or "Timeout" in str(e) or "429" in str(e):
-                print(f"DuckDuckGo Limit/Timeout! 20s bekleniyor... Hata: {e}")
-                time.sleep(20)
-            else:
-                print(f"Network error (internet dropped?). Waiting 30s before retry... Error: {e}")
-                time.sleep(30)
+        except Exception:
+            print("DuckDuckGo Limit/Timeout! 20s bekleniyor...")
+            time.sleep(20)
 
 def extract_with_openai(api_key, context, hotel_name):
     from openai import OpenAI

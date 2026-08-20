@@ -1,7 +1,6 @@
 import json
 import sqlite3
 from pathlib import Path
-import sys
 import torch
 from sentence_transformers import SentenceTransformer
 
@@ -113,7 +112,6 @@ def main():
     batch_size = 128 if device == "cuda" else 64
     print(f"Batch size: {batch_size}")
     
-    import time
     chunks_to_process = chunks[saved_count:]
     processed_count = saved_count
 
