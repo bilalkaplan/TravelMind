@@ -1,12 +1,12 @@
 # TravelMind RAG: My Offline-First Hotel Assistant
 
-Hey there! 👋 Welcome to TravelMind. This is a privacy-first, fully local AI assistant I built to recommend hotels and answer specific review-based questions. I wanted a system that runs 100% offline using the CMU/TripAdvisor dataset, so it doesn't rely on any external cloud APIs. 
+Hey there! Welcome to TravelMind. This is a privacy-first, fully local AI assistant I built to recommend hotels and answer specific review-based questions. I wanted a system that runs 100% offline using the CMU/TripAdvisor dataset, so it doesn't rely on any external cloud APIs. 
 
 I've optimized this to run smoothly on consumer hardware. It uses the `qwen3-4b-cuda-gpu:2` model natively via Foundry Local. Normal startup doesn't download any models from the internet—it's a true offline-first experience.
 
 ---
 
-## 🌟 Advanced RAG Features I've Added
+## Advanced RAG Features I've Added
 
 While building this, I realized standard RAG pipelines have some limitations, so I engineered a few advanced enhancements to make the system much more reliable and prevent hallucinations.
 
@@ -27,7 +27,7 @@ To make sure the AI *never* hallucinates (like inventing fake amenities or price
 
 ---
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 Since I had to make this work well on a 4GB VRAM limit, I split the workloads between the CPU and GPU:
 
@@ -38,7 +38,7 @@ Since I had to make this work well on a 4GB VRAM limit, I split the workloads be
 
 ---
 
-## 📦 Required Local Artifacts
+## Required Local Artifacts
 
 Because of GitHub's size limits, the large runtime databases and embedding matrices are ignored in `.gitignore`. If you're cloning this, it won't run until you place these files in the `data/` directory:
 
@@ -56,7 +56,7 @@ Because of GitHub's size limits, the large runtime databases and embedding matri
 
 ---
 
-## 🚀 Setup & Run (Windows)
+## Setup & Run (Windows)
 
 I tested and built this using Python 3.12. 
 
@@ -81,7 +81,7 @@ Start the Streamlit UI. It will automatically start Foundry Local and load the Q
 
 ---
 
-## 🛠️ Data Pipeline & Tests
+## Data Pipeline & Tests
 
 If you modify the core dataset, you'll need to rebuild the stats and matrices:
 
