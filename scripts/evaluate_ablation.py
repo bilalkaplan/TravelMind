@@ -39,7 +39,7 @@ def main():
         cards = results[:3]
         hotel_context_str = ""
         for i, res in enumerate(cards, start=1):
-            # mock card dict
+            # Build card dict for testing
             card_dict = {
                 "hotel_name": res["metadata"].get("hotel_name", "UNKNOWN"),
                 "location": res["metadata"].get("location", "UNKNOWN"),

@@ -29,14 +29,14 @@ download models.
 - Handles short conversational turns while keeping unsupported booking,
   price, and non-hotel claims outside the answer.
 
-## Advanced RAG Features (XAI & Hybrid Retrieval)
+## Advanced RAG Features
 
-TravelMind incorporates academic-level enhancements for a mature RAG pipeline:
-- **Hybrid Retrieval**: Combines semantic cosine similarity with a fast lexical (BM25-style) keyword scorer to prevent missing exact-match terms.
-- **Confidence Transparency**: Missing data signals (e.g., missing hotel class) are explicitly displayed in the UI, fulfilling Explainable AI (XAI) standards.
-- **Preference Accumulation**: The Streamlit session state remembers user requirements across multiple conversational turns (e.g., remembering "with pool" when changing cities).
-- **Contrastive Explanation**: The system dynamically inserts determinist reasoning into the LLM context, explaining *why* a hotel is ranked lower than another (e.g., due to missing parking data).
-- **Ablation Testing**: Includes quantitative test scripts (`scripts/evaluate_ablation.py`) to measure the hallucination-reduction impact of the fact-gate validator.
+I've recently added some advanced RAG techniques to improve the system's reliability and user experience:
+- **Hybrid Retrieval**: We now combine semantic cosine similarity with a fast lexical (BM25-style) keyword score. This helps catch exact matches like "parking" or specific hotel names that pure vector search sometimes misses.
+- **Confidence Transparency**: Missing data signals (e.g., missing hotel class) are explicitly shown under the score in the UI. This helps with Explainable AI (XAI) and gives the user a transparent view of the data.
+- **Preference Accumulation**: The Streamlit session state remembers user requirements across multiple conversational turns, so if you ask for a "pool" and then change cities, it remembers your preference.
+- **Contrastive Explanation**: The system dynamically adds a short note to the LLM context explaining *why* a hotel is ranked lower (e.g., due to missing parking data). This helps the model explain the ranking to the user naturally.
+- **Ablation Testing**: I've added a test script (`scripts/evaluate_ablation.py`) to measure how well the fact-gate validator prevents hallucinations.
 
 ## Local architecture
 
