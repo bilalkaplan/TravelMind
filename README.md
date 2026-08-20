@@ -1,67 +1,43 @@
 # TravelMind RAG
 
-TravelMind is a local hotel recommendation and review-question assistant. It
-retrieves hotels from the local CMU/TripAdvisor-derived dataset, ranks them,
-shows the best matches as Streamlit cards, and keeps the displayed hotels as
-grounding for later questions.
+TravelMind is a sophisticated, locally-hosted hotel recommendation and review-question assistant. Built with privacy and efficiency in mind, it operates entirely on your local machine using the CMU/TripAdvisor-derived dataset. By leveraging an advanced Retrieval-Augmented Generation (RAG) architecture, TravelMind provides highly accurate, fact-grounded recommendations without relying on external cloud APIs.
 
-The application uses the Qwen model already installed on this computer:
-`qwen3-4b-cuda-gpu:2`. Normal startup and the preflight check do **not**
-download models.
+The application is specifically optimized to use the Qwen model (`qwen3-4b-cuda-gpu:2`) natively installed on your computer. Normal startup and preflight checks do **not** download models from the internet, ensuring a true offline-first experience.
 
-## What it does
+## Core Features and Capabilities
 
-- Ranks hotels for a requested U.S. city and required amenities/room types.
-- Shows up to three cards with only recorded facts, including verified
-  amenities, room types, hotel class, score, phone, and map link when present.
-- Gives Qwen a fact-complete draft of the recommendation so it can express the
-  hotel features naturally. A local fact gate rejects invented amenities,
-  rooms, prices, links, or numbers and falls back to the grounded draft.
-- Tracks the currently selected displayed hotel. A hotel name selects that
-  card, “next hotel” advances the selection, and an omitted name initially
-  refers to the first card.
-- Answers property follow-ups from card metadata and review questions from
-  that hotel's retrieved review chunks. For example:
-  - `Does Arena Hotel have Wi-Fi and what room types are recorded?`
-  - `What do guests say about the rooms there?`
-  - `Any complaints about noise?`
-  - `How is the service at the second hotel?`
-- Handles short conversational turns while keeping unsupported booking,
-  price, and non-hotel claims outside the answer.
+### 1. Advanced Hybrid Retrieval (Vector + Keyword)
+At the heart of TravelMind is a robust hybrid search engine. Traditional RAG systems rely solely on semantic vector search (cosine similarity), which can sometimes overlook exact-match keywords (like a specific hotel brand or a hard requirement like "parking"). To solve this, TravelMind incorporates a fast lexical (BM25-style) keyword scoring mechanism that works in tandem with the semantic search. The final retrieval score is a weighted combination of semantic similarity, hotel type boosting, and keyword matching, ensuring you get the most accurate and relevant results every time.
 
-## Advanced RAG Features
+### 2. Confidence Transparency & Explainable AI (XAI)
+We believe that AI decision-making should not be a black box. TravelMind's scoring algorithm evaluates hotels across 9 distinct data signals (such as hotel class, service rating, cleanliness, etc.). When data is missing for a specific hotel, the system explicitly communicates this to the user. The UI displays exactly how many signals were used to calculate the final score and lists which specific metrics were missing (e.g., *"Score based on 7/9 signals. Missing: Hotel class, Parking"*). This provides a transparent, trustworthy view of the underlying data structure.
 
-I've recently added some advanced RAG techniques to improve the system's reliability and user experience:
-- **Hybrid Retrieval**: We now combine semantic cosine similarity with a fast lexical (BM25-style) keyword score. This helps catch exact matches like "parking" or specific hotel names that pure vector search sometimes misses.
-- **Confidence Transparency**: Missing data signals (e.g., missing hotel class) are explicitly shown under the score in the UI. This helps with Explainable AI (XAI) and gives the user a transparent view of the data.
-- **Preference Accumulation**: The Streamlit session state remembers user requirements across multiple conversational turns, so if you ask for a "pool" and then change cities, it remembers your preference.
-- **Contrastive Explanation**: The system dynamically adds a short note to the LLM context explaining *why* a hotel is ranked lower (e.g., due to missing parking data). This helps the model explain the ranking to the user naturally.
-- **Ablation Testing**: I've added a test script (`scripts/evaluate_ablation.py`) to measure how well the fact-gate validator prevents hallucinations.
+### 3. Session Preference Accumulation (Contextual Memory)
+Real conversations flow naturally, and an AI assistant should keep up. TravelMind's Streamlit-based UI features intelligent preference accumulation. If you request a "hotel with a pool" and later ask "What about in Dallas?", the system remembers your previous requirement for a pool. It seamlessly merges your intent across conversational turns, providing a fluid and context-aware user experience without requiring you to repeat your preferences.
 
-## Local architecture
+### 4. Contrastive Explanation for Rankings
+When presenting multiple options, users often wonder why one hotel is ranked lower than another. TravelMind solves this by dynamically injecting deterministic contrastive notes into the LLM's context window. By comparing the missing signals or score differences between the top results, the model can naturally explain to the user why a specific hotel was placed in the second or third spot (e.g., *"Ranked below the first option due to missing parking data"*).
 
-- **Retrieval:**
-  `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` runs on CPU
-  and searches the normalized local embedding matrix with cosine similarity.
-- **Ranking:** the single `WEIGHTS` mapping in
-  `src/travelmind_scoring.py` defines the 100-point model. Numeric review
-  averages and logarithmically normalized review volume come from
-  `data/hotel_review_stats.json`; missing ratings are skipped and the remaining
-  weights are renormalized.
-- **Generation:** the existing Foundry Local `qwen3-4b-cuda-gpu:2` model uses
-  the RTX 3050. Thinking is disabled for user-facing answers, output is bounded
-  by `<answer>` tags, and extraction occurs before validation.
-- **Review RAG:** review questions search only review chunks belonging to the
-  selected hotel. Answers may use the supplied evidence but cannot invent a
-  price, reservation state, or link.
+### 5. Robust Fact-Gate Validator (Ablation Tested)
+To strictly prevent hallucinations—such as inventing fake amenities, imaginary prices, or broken links—TravelMind employs a rigorous deterministic Fact-Gate. After the LLM generates an answer, the validator intercepts it and checks for any unverified claims. If a hallucination is detected, the system safely falls back to a grounded, template-based response. We have included an ablation testing suite (`scripts/evaluate_ablation.py`) to quantitatively measure and prove the hallucination-reduction impact of this validator.
 
-MiniLM is deliberately kept on CPU so the laptop's 4 GB VRAM remains available
-to Qwen.
+### 6. Review-Based Follow-Up Questions
+Beyond just recommending hotels, TravelMind can answer specific follow-up questions by searching through actual guest reviews. Want to know if the Wi-Fi is reliable, or if the rooms are noisy? The system retrieves the most relevant review chunks for the currently selected hotel and generates a grounded response based purely on real guest experiences.
 
-## Required local artifacts
+## Local Architecture
 
-The large runtime artifacts are ignored by Git. A clean clone is therefore not
-runnable until these existing files/caches have been copied into place:
+- **Retrieval:** 
+  The lightweight `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` model runs purely on the CPU. It searches the normalized local embedding matrix using cosine similarity, keeping your GPU memory completely free for the generative model.
+- **Scoring & Ranking:** 
+  The 100-point ranking system is defined in `src/travelmind_scoring.py`. It integrates numeric review averages and logarithmically normalized review volumes from `data/hotel_review_stats.json`. Missing ratings are intelligently skipped and the remaining weights are renormalized.
+- **Generation:** 
+  Text generation is powered by `qwen3-4b-cuda-gpu:2` running via Foundry Local on the RTX 3050. We optimize for speed and safety by disabling continuous "thinking" for user-facing outputs and enforcing strict `<answer>` tag boundaries before extraction and validation.
+- **Review RAG:** 
+  Review questions search only within the specific review chunks belonging to the selected hotel. The AI is strictly instructed to use the supplied evidence and is blocked from inventing prices, reservation states, or external links.
+
+## Required Local Artifacts
+
+The large runtime artifacts are ignored by Git (as configured in `.gitignore`). A clean clone is therefore not runnable until these existing files and caches have been copied into place:
 
 | Artifact | Purpose |
 | --- | --- |
@@ -75,12 +51,11 @@ runnable until these existing files/caches have been copied into place:
 | Hugging Face cache for MiniLM | Offline query embeddings |
 | Foundry Local cache for `qwen3-4b-cuda-gpu:2` | Offline answer generation |
 
-`data/raw/cmu_tripadvisor/review.txt` is required only when rebuilding review
-statistics, not for normal chat.
+*Note: `data/raw/cmu_tripadvisor/review.txt` is required only when rebuilding review statistics, not for normal chat operations.*
 
-## Install and run on Windows
+## Install and Run on Windows
 
-Python 3.12 is the tested version. From the repository root:
+Python 3.12 is the tested and recommended version. From the repository root, run:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -88,35 +63,29 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-First run the read-only preflight. It verifies every required data file, exact
-database/embedding ID alignment, both local model caches, and never starts or
-downloads a model:
+First, run the read-only preflight check. It verifies every required data file, ensures exact database/embedding ID alignment, checks both local model caches, and never starts or downloads a model:
 
 ```powershell
 .venv\Scripts\python.exe scripts\verify_runtime_artifacts.py
 ```
 
-Then launch Streamlit:
+Then, launch the Streamlit User Interface:
 
 ```powershell
 .venv\Scripts\python.exe -m streamlit run ui\app.py
 ```
 
-TravelMind starts the installed Foundry Local service when needed and loads the
-already-cached Qwen model into VRAM. Do not run
-`scripts\setup_foundry_runtime.py` merely to start the app; that script is only
-for explicitly preparing a machine. Its default mode reuses cached artifacts
-only; downloads require the separate, explicit `--allow-download` flag.
+TravelMind automatically starts the installed Foundry Local service when needed and loads the already-cached Qwen model into VRAM. Do not run `scripts\setup_foundry_runtime.py` merely to start the app; that script is only for explicitly preparing a new machine. Its default mode reuses cached artifacts only; internet downloads require the separate, explicit `--allow-download` flag.
 
-## Rebuild derived data
+## Rebuild Derived Data
 
-After changing the raw reviews:
+After modifying the raw reviews, update the stats:
 
 ```powershell
 .venv\Scripts\python.exe scripts\build_review_stats.py
 ```
 
-After changing the database `chunks` table:
+After modifying the database `chunks` table, rebuild the embeddings and indexes:
 
 ```powershell
 .venv\Scripts\python.exe scripts\build_embedding_matrix.py
@@ -124,7 +93,9 @@ After changing the database `chunks` table:
 .venv\Scripts\python.exe scripts\verify_runtime_artifacts.py
 ```
 
-## Regression checks
+## Regression Checks & Testing
+
+To ensure the integrity of the system after making modifications, run the full test suite:
 
 ```powershell
 .venv\Scripts\python.exe -m pytest -q
@@ -132,8 +103,5 @@ After changing the database `chunks` table:
 .venv\Scripts\python.exe scripts\benchmark_detroit.py
 ```
 
-The Detroit benchmark performs five foreground runs and reports first-token
-latency, total time, answer length, preamble extraction, and validator fallback.
-The review script exercises the required rooms/noise/service questions and
-prints the selected hotel, evidence count, validator messages, and fallback
-state.
+- **The Detroit benchmark** performs five foreground runs and reports first-token latency, total generation time, answer length, preamble extraction success, and validator fallback rates.
+- **The review script** exercises the required rooms/noise/service questions and prints the selected hotel, evidence count, validator messages, and fallback state.
