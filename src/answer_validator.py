@@ -122,7 +122,7 @@ def detect_repetition_loop(answer: str, min_repeats: int = 3) -> bool:
 
 def detect_internal_analysis(answer: str) -> bool:
     forbidden = [
-        "let me check", "düşünüyor...", "let's check",
+        "let me check", "thinking...", "let's check",
         "i need to confirm", "okay, the user",
         "looking at the provided", "provided hotel cards",
         "after checking", "in conclusion, after checking",
@@ -133,10 +133,10 @@ def detect_internal_analysis(answer: str) -> bool:
         "i know the rules", "the user's question", "the user's request",
         "the answer must", "my answer must", "final answer must",
         "chain-of-thought", "hidden reasoning",
-        "kullanıcı soruyor", "kullanıcının isteği", "bir değerlendireyim",
-        "bir bakayım", "kısaca özetlemek gerekirse",
-        "şimdi bilgileri kontrol ediyorum",
-        "kullanıcı arıyor", "kullanıcı istiyor"
+        "user asks", "user's request", "let me evaluate",
+        "let me see", "to summarize briefly",
+        "now checking the information",
+        "user is searching", "user wants"
     ]
     ans_lower = answer.lower()
     if any(f in ans_lower for f in forbidden):
@@ -154,8 +154,8 @@ def detect_internal_analysis(answer: str) -> bool:
 
 def detect_placeholders(answer: str) -> bool:
     placeholders = [
-        "[insert", "[skor]", "[puan]", "[hotel name", "[otel adı",
-        "travelmind is analyzing", "travelmind analiz ediyor",
+        "[insert", "[score]", "[rating]", "[hotel name",
+        "travelmind is analyzing",
         "chunk type:", "amenities_source:",
         "requirement_satisfaction:", "rank_score:",
     ]
@@ -182,17 +182,17 @@ def find_score_overflow_claims(answer: str) -> list:
 
 def find_price_or_booking_claims(answer: str) -> list:
     price_keywords = [
-        r"\$", "dollar", "euro", "£", "€", "₺", "tl",
-        "per night", "nightly rate", "gecelik", "fiyatı",
-        "rezervasyon yapabilirsiniz", "book now", "booking.com", "expedia",
+        r"\$", "dollar", "euro", "£", "€",
+        "per night", "nightly rate", "price",
+        "book now", "booking.com", "expedia",
         "reserve now", "available tonight", "available for booking",
-        "rooms are available now", "müsait oda var"
+        "rooms are available now", "you can book", "rooms are available"
     ]
     refusal_keywords = [
-        "cannot provide live prices", "fiyat verisi güvenilir değil",
-        "canlı fiyat", "fiyat bilgisi sunmaz",
+        "cannot provide live prices", "price data is not reliable",
+        "live price", "does not provide price info",
         "does not provide live price", "not available",
-        "does not provide", "sunmaz", "kapsamı dışında",
+        "does not provide", "out of scope",
         "cannot confirm availability", "cannot confirm single-room availability"
     ]
     
@@ -201,7 +201,7 @@ def find_price_or_booking_claims(answer: str) -> list:
         lower_sent = sentence.lower()
         has_price_kw = False
         for kw in price_keywords:
-            if kw in [r"\$", "£", "€", "₺"]:
+            if kw in [r"\$", "£", "€"]:
                 if kw.replace("\\", "") in lower_sent:
                     has_price_kw = True
                     break
@@ -216,13 +216,13 @@ def find_price_or_booking_claims(answer: str) -> list:
             if (
                 has_number
                 or "book now" in lower_sent
-                or "rezervasyon" in lower_sent
                 or "reserve now" in lower_sent
                 or "booking.com" in lower_sent
                 or "available tonight" in lower_sent
                 or "available for booking" in lower_sent
                 or "rooms are available now" in lower_sent
-                or "müsait oda var" in lower_sent
+                or "you can book" in lower_sent
+                or "rooms are available" in lower_sent
             ):
                 claims.append(sentence)
     return claims
@@ -234,7 +234,7 @@ def detect_price_claims(answer: str) -> bool:
 def is_negative_context(sentence: str) -> bool:
     negatives = [
         r"\bnot\b", r"\bno\b", r"\bdoesn't\b", r"\bdon't\b", r"\bisn't\b", r"\baren't\b",
-        r"\byok\b", r"\bbulunmuyor\b", r"mevcut değil", r"\bolmadığı\b", r"\bsunmuyor\b", r"\byoktur\b", r"\bbulunmamaktadır\b"
+        r"\bnone\b", r"\bnot found\b", r"not available", r"\bnot being\b", r"\bdoes not offer\b", r"\bis not\b", r"\bdoes not exist\b"
     ]
     sent_lower = sentence.lower()
     return any(re.search(neg, sent_lower) for neg in negatives)
@@ -242,7 +242,7 @@ def is_negative_context(sentence: str) -> bool:
 def find_room_guarantees(answer: str, hotel_cards: list) -> list:
     live_availability_phrases = [
         "rooms are available now", "available for booking", 
-        "available tonight", "müsait oda var", "rezervasyon yapabilirsiniz"
+        "available tonight", "available room exists", "you can reserve"
     ]
     single_room_phrases = [
         "single room is available", "single room available"
@@ -256,7 +256,7 @@ def find_room_guarantees(answer: str, hotel_cards: list) -> list:
         "this information is not available",
         "appears in the current room data",
         "is confirmed in the current amenity data",
-        "görünmektedir", "doğrulanıyor", "görünmüyor"
+        "appears to be", "is confirmed", "does not appear"
     ]
     claims = []
     for sentence in _split_sentences(answer):
@@ -285,8 +285,7 @@ def detect_room_guarantee(answer: str, hotel_cards: list) -> bool:
 def find_amenity_false_claims(answer: str, hotel_cards: list) -> list:
     breakfast_claims = [
         "has breakfast", "breakfast included", "breakfast is available",
-        "breakfast service", "kahvaltısı var", "kahvaltı sunuyor",
-        "kahvaltı hizmeti"
+        "breakfast service", "offers breakfast"
     ]
     claims = []
     for sentence in _split_sentences(answer):
@@ -357,7 +356,6 @@ def find_fabricated_links(answer: str, hotel_cards: list, evidence_text: str = "
     return fabricated
 
 def build_safe_fallback_answer(
-    target_language: str,
     intent: str,
     hotel_cards: list = None,
     requested_location: str | None = None,
@@ -368,33 +366,24 @@ def build_safe_fallback_answer(
         return safe_card_based_fallback_answer(
             hotel_cards=hotel_cards or [],
             city=requested_location,
-            language=target_language,
+            language="english",
         )
     
     if intent == "price":
-        if target_language.lower() in ["turkish", "tr"]:
-            return "TravelMind sisteminde gerçek zamanlı rezervasyon verisi bulunmadığı için canlı fiyat veya müsaitlik bilgisi sağlanamamaktadır."
-        else:
-            return "TravelMind does not provide live pricing or availability because our system does not contain real-time booking data."
+        return "TravelMind does not provide live pricing or availability because our system does not contain real-time booking data."
             
     if intent in ("follow_up", "specific_hotel_info", "review_question"):
-        if target_language.lower() in ["turkish", "tr"]:
-            return "İstediğiniz detayı doğrudan veri setimizde net olarak doğrulayamadım. Size başka nasıl yardımcı olabilirim?"
-        else:
-            return "I couldn't clearly verify that specific detail in our dataset. How else can I help you?"
+        return "I couldn't clearly verify that specific detail in our dataset. How else can I help you?"
             
     # Default fallback
-    if target_language.lower() in ["turkish", "tr"]:
-        return "TravelMind canlı fiyat veya rezervasyon bilgisi göstermez. Lütfen sadece konum belirterek arama yapınız."
-    else:
-        return "TravelMind does not provide live pricing or availability, only hotel recommendations based on historical reviews. Please try your search again using just a location."
+    return "TravelMind does not provide live pricing or availability, only hotel recommendations based on historical reviews. Please try your search again using just a location."
 
 def validate_answer(
     answer: str,
     hotel_cards: list,
     intent: str,
     requested_location: str,
-    target_language: str,
+    target_language: str,  # unused: output is always English; kept for the many existing call sites
     evidence_text=None,
     allowed_hotel_names=None,
 ) -> dict:
@@ -479,8 +468,8 @@ def validate_answer(
     generic_terms = [
         "this hotel", "the hotel", "boutique hotel", "luxury hotel", "great hotel",
         "excellent hotel", "beautiful hotel", "nice hotel", "good hotel", "best hotel",
-        "grand hotel", "spa resort", "family resort", "business hotel", "harika hotel",
-        "mükemmel hotel", "güzel hotel", "iyi hotel", "a hotel", "an hotel",
+        "grand hotel", "spa resort", "family resort", "business hotel",
+        "wonderful hotel", "perfect hotel", "a hotel", "an hotel",
     ]
 
     for potential_hotel in potential_hotels:
@@ -549,7 +538,7 @@ def validate_answer(
     sanitized = answer
     if blocking_issues:
         sanitized = build_safe_fallback_answer(
-            target_language, intent, hotel_cards, requested_location
+            intent, hotel_cards, requested_location
         )
 
     return {

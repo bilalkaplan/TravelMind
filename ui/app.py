@@ -481,8 +481,9 @@ def render_hotel_card(card):
             missing_signals = card.get("missing_signals", [])
             if missing_signals:
                 signals_text = ", ".join(missing_signals)
-                valid_count = 9 - len(missing_signals)
-                st.caption(f"Score based on {valid_count}/9 signals. Missing: {signals_text}")
+                total_signals = len(WEIGHTS)
+                valid_count = total_signals - len(missing_signals)
+                st.caption(f"Score based on {valid_count}/{total_signals} signals. Missing: {signals_text}")
             if map_url:
                 st.markdown(f"👉 **[{t['map']}]({map_url})**")
 

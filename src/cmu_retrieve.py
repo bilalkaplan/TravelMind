@@ -38,9 +38,31 @@ def normalize_text(text):
     text = str(text).lower()
     text = text.replace("'", " ")
     text = text.replace("’", " ")
-    text = re.sub(r"[^a-zA-Z0-9ğüşöçıİĞÜŞÖÇ\s]", " ", text)
+    text = re.sub(r"[^a-zA-Z0-9\s]", " ", text)
     text = re.sub(r"\s+", " ", text)
     return text.strip()
+
+def keyword_overlap_score(keyword_terms, text, hotel_name):
+    """Lexical half of hybrid retrieval: rewards exact query-term hits in a
+    chunk's text or hotel name so brand names and hard constraints (e.g.
+    "parking") aren't lost to purely semantic similarity. A text hit is worth
+    0.15 per matched term (as a fraction of all query terms); a hotel-name
+    hit is worth double that, since an exact brand-name match is a much
+    stronger relevance signal than the term merely appearing in review text."""
+    if not keyword_terms:
+        return 0.0
+
+    text_norm = normalize_text(text)
+    hotel_name_norm = normalize_text(hotel_name)
+
+    matches = 0
+    for term in keyword_terms:
+        if f" {term} " in f" {text_norm} ":
+            matches += 1
+        if term in hotel_name_norm:
+            matches += 2
+
+    return (matches / len(keyword_terms)) * 0.15
 
 def get_or_load_embedding_model():
     global _cached_model
@@ -575,19 +597,9 @@ def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS,
             type_boost = 0.0
 
         # Hybrid Retrieval (Vector + Keyword)
-        keyword_score = 0.0
-        if keyword_terms:
-            text_norm = normalize_text(row["text"])
-            hotel_name_norm = normalize_text(row["metadata"].get("hotel_name", ""))
-            
-            matches = 0
-            for term in keyword_terms:
-                if f" {term} " in f" {text_norm} ":
-                    matches += 1
-                if term in hotel_name_norm:
-                    matches += 2
-                    
-            keyword_score = (matches / len(keyword_terms)) * 0.15
+        keyword_score = keyword_overlap_score(
+            keyword_terms, row["text"], row["metadata"].get("hotel_name", "")
+        )
 
         final_score = vector_score + type_boost + keyword_score
 
