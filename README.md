@@ -29,6 +29,15 @@ download models.
 - Handles short conversational turns while keeping unsupported booking,
   price, and non-hotel claims outside the answer.
 
+## Advanced RAG Features (XAI & Hybrid Retrieval)
+
+TravelMind incorporates academic-level enhancements for a mature RAG pipeline:
+- **Hybrid Retrieval**: Combines semantic cosine similarity with a fast lexical (BM25-style) keyword scorer to prevent missing exact-match terms.
+- **Confidence Transparency**: Missing data signals (e.g., missing hotel class) are explicitly displayed in the UI, fulfilling Explainable AI (XAI) standards.
+- **Preference Accumulation**: The Streamlit session state remembers user requirements across multiple conversational turns (e.g., remembering "with pool" when changing cities).
+- **Contrastive Explanation**: The system dynamically inserts determinist reasoning into the LLM context, explaining *why* a hotel is ranked lower than another (e.g., due to missing parking data).
+- **Ablation Testing**: Includes quantitative test scripts (`scripts/evaluate_ablation.py`) to measure the hallucination-reduction impact of the fact-gate validator.
+
 ## Local architecture
 
 - **Retrieval:**

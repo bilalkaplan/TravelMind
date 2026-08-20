@@ -565,8 +565,10 @@ def calculate_travelmind_score(
         ("review_volume", "Yorum Hacmi", review_volume_score, review_volume_reason),
     )
 
+    missing_signals = []
     for key, name, score, reason in component_values:
         if score is None:
+            missing_signals.append(name)
             continue
         weight = WEIGHTS[key]
         weighted_sum += score * weight
@@ -589,6 +591,7 @@ def calculate_travelmind_score(
     return {
         "travelmind_score": final_score,
         "components": components,
+        "missing_signals": missing_signals,
     }
 
 def build_strengths(result):

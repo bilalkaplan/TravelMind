@@ -195,6 +195,14 @@ def build_hotel_context(query, card, index, lang_code="en"):
     amenities_str = join_english(facts["amenities"]) or "None supplied"
     room_types_str = join_english(facts["room_types"]) or "None supplied"
 
+    contrastive_note = ""
+    if index > 1:
+        missing = card.get("missing_signals", [])
+        if missing:
+            contrastive_note = f"\n- Ranking note: Ranked below Hotel 1 partly due to missing data for: {', '.join(missing)}."
+        else:
+            contrastive_note = f"\n- Ranking note: Ranked below Hotel 1 due to a slightly lower overall TravelMind suitability score."
+
     context = f"""
 Hotel Card {index}:
 - Hotel name: {facts['hotel_name']}
@@ -204,7 +212,7 @@ Hotel Card {index}:
 - Verified map link: {map_link}
 - TravelMind suitability score: {facts['score'] or 'Not stated'}
 - Verified amenities: {amenities_str}
-- Recorded room types (static categories, not live availability): {room_types_str}
+- Recorded room types (static categories, not live availability): {room_types_str}{contrastive_note}
 """
 
     return context.strip()

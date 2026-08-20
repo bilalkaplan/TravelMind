@@ -553,6 +553,11 @@ def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS,
     # Metadata/text is fetched from the database only for this small candidate set.
     candidate_rows = fetch_chunk_rows_by_id([int(ids[i]) for i in top_idx])
 
+    query_norm = normalize_text(query)
+    query_terms = set(query_norm.split())
+    stop_words = {"hotel", "hotels", "in", "the", "a", "an", "and", "or", "with", "for", "to", "of", "is", "are"}
+    keyword_terms = query_terms - stop_words
+
     scored_records = []
     for i in top_idx:
         row_id = int(ids[i])
@@ -570,13 +575,29 @@ def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS,
         else:
             type_boost = 0.0
 
-        final_score = vector_score + type_boost
+        # Hybrid Retrieval (Vector + Keyword)
+        keyword_score = 0.0
+        if keyword_terms:
+            text_norm = normalize_text(row["text"])
+            hotel_name_norm = normalize_text(row["metadata"].get("hotel_name", ""))
+            
+            matches = 0
+            for term in keyword_terms:
+                if f" {term} " in f" {text_norm} ":
+                    matches += 1
+                if term in hotel_name_norm:
+                    matches += 2
+                    
+            keyword_score = (matches / len(keyword_terms)) * 0.15
+
+        final_score = vector_score + type_boost + keyword_score
 
         scored_records.append(
             {
                 "score": final_score,
                 "vector_score": vector_score,
                 "type_boost": type_boost,
+                "keyword_score": keyword_score,
                 "record": row,
             }
         )
@@ -626,6 +647,7 @@ def search(query, location_filter=None, filters=None, top_k_hotels=TOP_K_HOTELS,
             {
                 "score": item["score"],
                 "vector_score": item["vector_score"],
+                "keyword_score": item.get("keyword_score", 0.0),
                 "location_boost": item.get("location_boost", 0.0),
                 "type_boost": item["type_boost"],
                 "chunk_id": record["chunk_id"],

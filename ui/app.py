@@ -205,6 +205,8 @@ if "theme_internal" not in st.session_state:
     st.session_state.theme_internal = "dark"
 if "current_location" not in st.session_state:
     st.session_state.current_location = None
+if "user_preferences" not in st.session_state:
+    st.session_state.user_preferences = {}
 
 if st.session_state.theme_internal == "dark":
     bg_color = "#121212"
@@ -476,6 +478,11 @@ def render_hotel_card(card):
 
         with c2:
             st.metric(t["score_label"], f"{score:.1f}/100")
+            missing_signals = card.get("missing_signals", [])
+            if missing_signals:
+                signals_text = ", ".join(missing_signals)
+                valid_count = 9 - len(missing_signals)
+                st.caption(f"Score based on {valid_count}/9 signals. Missing: {signals_text}")
             if map_url:
                 st.markdown(f"👉 **[{t['map']}]({map_url})**")
 
@@ -519,6 +526,11 @@ if st.session_state.messages and st.session_state.messages[-1]["role"] == "user"
                 parsed_location = router_res.get("location", None)
                 query_requirements = router_res.get("query_requirements", {})
                 route_res = router_res
+
+            for k, v in query_requirements.items():
+                if v and str(v).strip().upper() != "NOT_REQUESTED":
+                    st.session_state.user_preferences[k] = v
+            query_requirements = dict(st.session_state.user_preferences)
 
             if parsed_location:
                 st.session_state.current_location = parsed_location

@@ -321,6 +321,7 @@ def build_hotel_cards(
             "chunk_type": str(res.get("chunk_type", "UNKNOWN")),
             "travelmind_score": presented_score,
             "rank_score": rank_score,
+            "missing_signals": travelmind_scoring_dict.get("missing_signals", []),
             "requirement_satisfaction": requirement_satisfaction,
             "similarity_score": str(res.get("vector_score", "UNKNOWN")),
             "map_link_type": map_link_type,
