@@ -7,7 +7,9 @@ from difflib import SequenceMatcher
 def similar(a, b):
     return SequenceMatcher(None, a, b).ratio()
 
-API_KEY = "42f24fd0c1msh826a591e9287015p1c7fc6jsnd6ae0de0dcce"
+# Set RAPIDAPI_KEY in your environment before running this script; it is
+# never read from source so the repo stays safe to publish.
+API_KEY = os.environ.get("RAPIDAPI_KEY", "")
 HOST = "booking-com15.p.rapidapi.com"
 HEADERS = {
     "X-RapidAPI-Key": API_KEY,
@@ -94,9 +96,9 @@ def get_hotel_room_types(hotel_id):
 def main():
     metadata = load_metadata()
     
-    # Kotayı (Quota) korumak için tek seferde işlenecek maksimum otel sayısını belirliyoruz.
-    # RapidAPI genellikle ayda 500 istek ücretsiz verir ancak bazı paketlerde 50'dir. Her otel için 2 istek atılıyor.
-    # Güvenlik amacıyla bu scripti her çalıştırdığımızda en fazla 20 otel işleyelim (40 istek).
+    # To protect the quota, we set a maximum number of hotels to process at once.
+    # RapidAPI usually gives 500 requests/month, but some packages are 50. 2 requests per hotel.
+    # For safety, we process at most 20 hotels (40 requests) per run.
     MAX_PROCESSED = 20
     
     processed = 0
@@ -107,7 +109,7 @@ def main():
         if rate_limited or processed >= MAX_PROCESSED:
             break
             
-        # Zaten Booking verisi çekilmişse atla
+        # Skip if booking data is already pulled
         if "booking_room_types" in hotel_data:
             continue
             
@@ -141,7 +143,7 @@ def main():
         processed += 1
         save_metadata(metadata)
         
-        # Saniyede 1 istek limitini aşmamak için bekleme süresini artırıyoruz
+        # Sleep to avoid exceeding the 1 request per second limit
         time.sleep(2)
 
     print(f"\nFinished processing. Processed: {processed}, Success: {success}")
