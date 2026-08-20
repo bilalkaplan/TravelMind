@@ -169,3 +169,36 @@ def test_location_and_named_hotel_are_hard_card_constraints():
     )
 
     assert [card["hotel_id"] for card in cards] == ["900011"]
+
+
+def test_keyword_overlap_score_rewards_exact_hotel_name_match():
+    keyword_terms = {"marriott"}
+
+    named_match = cmu_retrieve.keyword_overlap_score(
+        keyword_terms, "Reviews mention a nice stay overall.", "Downtown Marriott"
+    )
+    no_match = cmu_retrieve.keyword_overlap_score(
+        keyword_terms, "Reviews mention a nice stay overall.", "Downtown Hilton"
+    )
+
+    assert named_match > no_match
+    assert named_match == pytest.approx(0.3)
+    assert no_match == 0.0
+
+
+def test_keyword_overlap_score_rewards_exact_text_match_over_none():
+    keyword_terms = {"parking"}
+
+    text_match = cmu_retrieve.keyword_overlap_score(
+        keyword_terms, "Free parking is available on site.", "Some Hotel"
+    )
+    no_match = cmu_retrieve.keyword_overlap_score(
+        keyword_terms, "Breakfast is included with every stay.", "Some Hotel"
+    )
+
+    assert text_match > 0.0
+    assert no_match == 0.0
+
+
+def test_keyword_overlap_score_is_zero_with_no_keyword_terms():
+    assert cmu_retrieve.keyword_overlap_score(set(), "Free parking on site.", "Some Hotel") == 0.0

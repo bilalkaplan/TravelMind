@@ -269,6 +269,33 @@ def test_hotel_context_contains_verified_amenities_and_static_room_types():
     assert "not live availability" in context
 
 
+def test_hotel_context_omits_contrastive_note_for_top_ranked_hotel():
+    context = cmu_rag_answer.build_hotel_context(
+        "Hotels in Detroit",
+        {"hotel_name": "First Hotel", "missing_signals": ["Hotel Class"]},
+        1,
+    )
+    assert "Ranking note" not in context
+
+
+def test_hotel_context_names_missing_signals_for_lower_ranked_hotel():
+    context = cmu_rag_answer.build_hotel_context(
+        "Hotels in Detroit",
+        {"hotel_name": "Second Hotel", "missing_signals": ["Hotel Class", "Amenities Match"]},
+        2,
+    )
+    assert "Ranking note: Ranked below Hotel 1 partly due to missing data for: Hotel Class, Amenities Match." in context
+
+
+def test_hotel_context_uses_generic_note_when_no_signals_missing():
+    context = cmu_rag_answer.build_hotel_context(
+        "Hotels in Detroit",
+        {"hotel_name": "Second Hotel", "missing_signals": []},
+        2,
+    )
+    assert "Ranking note: Ranked below Hotel 1 due to a slightly lower overall TravelMind suitability score." in context
+
+
 def test_stream_extract_answer_buffers_and_removes_opening_tag():
     response = [
         _Chunk("<thi"),

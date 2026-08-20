@@ -142,7 +142,29 @@ def test_calculate_travelmind_score_missing_meta():
         "text": "Okay hotel.",
         "score": 0.8
     }
-    
+
     scoring = calculate_travelmind_score("", result)
     assert "travelmind_score" in scoring
     assert scoring["travelmind_score"] >= 0
+
+
+def test_missing_signals_lists_every_component_when_all_data_is_absent():
+    result = {"metadata": {}, "text": "", "score": 0.0}
+
+    scoring = calculate_travelmind_score("", result)
+
+    assert "missing_signals" in scoring
+    assert len(scoring["missing_signals"]) == len(WEIGHTS)
+
+
+def test_missing_signals_excludes_components_with_real_data():
+    result = {
+        "metadata": {"hotel_class": "4.5"},
+        "text": "",
+        "score": 0.0,
+    }
+
+    scoring = calculate_travelmind_score("", result)
+
+    assert "Hotel Class" not in scoring["missing_signals"]
+    assert len(scoring["missing_signals"]) == len(WEIGHTS) - 1
